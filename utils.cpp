@@ -1,4 +1,5 @@
 #include "utils.h"
+#include "Delaunay.h"
 
 void map_vertices_to_vector(
     Delaunay &delaunay,
@@ -21,23 +22,19 @@ void write_faces_to_vector(
     std::vector<std::array<size_t, 3> > &faces,
     std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index
 ) {
-    for (auto facet = delaunay.facets_begin();
-        facet != delaunay.facets_end(); ++facet) {
-        if (!delaunay.is_infinite(*facet)){
-            const Delaunay::Full_cell_handle cell = facet->full_cell();
-            const int opposite_vertex = facet->index_of_covertex();
+    for (auto facet = delaunay.facets_begin(); facet != delaunay.facets_end(); ++facet) {
+        if (!delaunay.is_infinite(*facet) && delaunay.current_dimension() > 1) {
 
-            std::array<size_t, 3> face;
+            std::array<size_t, 3> face{};
             size_t face_vertex_idx = 0;
+            std::vector<Delaunay::Vertex_handle> face_vertices;
 
-            for (int i = 0; i < 4; ++i) {
-                if (i != opposite_vertex) {
-                    Delaunay::Vertex_handle vh = cell->vertex(i);
-                    face[face_vertex_idx++] = vertex_to_index[vh];
-                    }
-                }
-
-                faces.push_back(face);
+            getFacetVertices(delaunay, facet, face_vertices);
+            std::cout << face_vertices.size() << std::endl;
+            for (int i = 0; i < delaunay.maximal_dimension(); ++i) {
+                face[face_vertex_idx++] = vertex_to_index[face_vertices[i]];
             }
+            faces.push_back(face);
+        }
     }
 }

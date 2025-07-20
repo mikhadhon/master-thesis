@@ -9,15 +9,14 @@ int main() {
     double samples[][3] = {
         {0, 0, 0},
         {2, 0, 0},
-        {1, 2, 0},
-        {1, 0.5, 1}
+        // {1, 2, 0},
+        // {1, 0.5, 1}
     };
 
 
     Delaunay delaunay3D(3);
 
     std::vector<Delaunay::Point> points;
-    points.reserve(13);
 
     for (auto & sample : samples) {
         Delaunay::Point p(&sample[0], &sample[3]);
@@ -40,14 +39,16 @@ int main() {
     std::cout << "Number of vertices: " << vertices.size() << std::endl;
     std::cout << "Number of faces: " << faces.size() << std::endl;
 
-    auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
+    if (!faces.empty()) {
+        auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
+    }
 
     polyscope::show();
 
     Point criticalPoint;
     for (auto facet = delaunay3D.facets_begin(); facet != delaunay3D.facets_end(); ++facet) {
         if (!delaunay3D.is_infinite(*facet)) {
-            indexTwoCriticalPoint(&delaunay3D, facet, &criticalPoint);
+            indexTwoCriticalPoint(delaunay3D, facet, criticalPoint);
         }
     }
 
