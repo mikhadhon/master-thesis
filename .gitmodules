@@ -1,0 +1,3 @@
+[submodule "borromean-rings"]
+	path = borromean-rings
+	url = https://gitlab.cg.tu-berlin.de/mkohlbrenner/borromean-rings.git
