@@ -4,6 +4,7 @@
 
 #include "Delaunay.h"
 #include "utils.h"
+#include "polyscope/curve_network.h"
 
 int main() {
     double samples[][3] = {
@@ -13,15 +14,26 @@ int main() {
         // {1, 0.5, 1}
     };
 
+    Eigen::Matrix<double, Eigen::Dynamic, 3> V;
+    Eigen::Matrix<double, Eigen::Dynamic, 3> N1;
+    Eigen::Matrix<double, Eigen::Dynamic, 3> N2;
+    Eigen::Matrix<double, Eigen::Dynamic, 3> T;
+
+    generate_circle(100, 0, V, N1, N2, T);
 
     Delaunay delaunay3D(3);
 
     std::vector<Delaunay::Point> points;
 
-    for (auto & sample : samples) {
-        Delaunay::Point p(&sample[0], &sample[3]);
+    for (int i = 0; i < V.rows(); i++) {
+        Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));
         points.push_back(p);
     }
+
+    // for (auto & sample : samples) {
+    //     Delaunay::Point p(&sample[0], &sample[3]);
+    //     points.push_back(p);
+    // }
 
     insertPoints(points, delaunay3D);
 
@@ -31,26 +43,32 @@ int main() {
 
     std::vector<std::array<double, 3> > vertices;
     std::vector<std::array<size_t, 3> > faces;
+    std::vector<std::array<size_t, 2> > edges;
     std::map<Delaunay::Vertex_handle, size_t> vertex_to_index;
 
     map_vertices_to_vector(delaunay3D, vertices, vertex_to_index);
     write_faces_to_vector(delaunay3D, faces, vertex_to_index);
+    extract_edges(delaunay3D, vertex_to_index, edges);
 
     std::cout << "Number of vertices: " << vertices.size() << std::endl;
     std::cout << "Number of faces: " << faces.size() << std::endl;
+    std::cout << "Number of edges: " << edges.size() << std::endl;
 
     if (!faces.empty()) {
         auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
     }
+    if (!edges.empty()) {
+        auto *psCurve = polyscope::registerCurveNetwork("delaunay vertices", vertices, edges);
+    }
 
     polyscope::show();
 
-    Point criticalPoint;
-    for (auto facet = delaunay3D.facets_begin(); facet != delaunay3D.facets_end(); ++facet) {
-        if (!delaunay3D.is_infinite(*facet)) {
-            indexTwoCriticalPoint(delaunay3D, facet, criticalPoint);
-        }
-    }
+    // Point criticalPoint;
+    // for (auto facet = delaunay3D.facets_begin(); facet != delaunay3D.facets_end(); ++facet) {
+    //     if (!delaunay3D.is_infinite(*facet)) {
+    //         indexTwoCriticalPoint(delaunay3D, facet, criticalPoint);
+    //     }
+    // }
 
     return 0;
 }
