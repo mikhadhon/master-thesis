@@ -3,6 +3,7 @@
 #include <polyscope/surface_mesh.h>
 
 #include "Delaunay.h"
+#include "FlowComplex.h"
 #include "utils.h"
 #include "polyscope/curve_network.h"
 
@@ -48,8 +49,10 @@ int main() {
     std::map<Delaunay::Vertex_handle, size_t> vertex_to_index;
 
     map_vertices_to_vector(delaunay3D, vertices, vertex_to_index);
-    write_faces_to_vector(delaunay3D, faces, vertex_to_index);
+    // write_faces_to_vector(delaunay3D, faces, vertex_to_index);
     extract_edges(delaunay3D, vertex_to_index, edges);
+
+    flow_complex(delaunay3D, vertices, faces, vertex_to_index);
 
     std::cout << "Number of vertices: " << vertices.size() << std::endl;
     std::cout << "Number of faces: " << faces.size() << std::endl;

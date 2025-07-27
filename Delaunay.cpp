@@ -33,8 +33,60 @@ bool is_index_two_critical_point(const std::vector<Delaunay::Vertex_handle> &fac
     return i.dot(j) > 0 && i.dot(l) > 0 && j.dot(l) > 0;
 }
 
-bool is_gabriel(Edge) {
+bool is_gabriel(Edge &edge) {
+    std::vector<Delaunay::Full_cell_handle> cell_neighbors;
+    get_incident_cells(edge, cell_neighbors);
+    std::set<Delaunay::Vertex_handle> neighboring_vertices;
 
+    for (auto cell : cell_neighbors) {
+        for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
+            neighboring_vertices.insert(*v);
+        }
+    }
+
+    Eigen::Vector3d i(edge.vertex1->point()[0], edge.vertex1->point()[1], edge.vertex1->point()[2]);
+    Eigen::Vector3d j(edge.vertex2->point()[0], edge.vertex2->point()[1], edge.vertex2->point()[2]);
+
+    Eigen::Vector3d center = (i + j) / 2;
+    double radius = (i - j).norm() / 2;
+
+    for (auto vertex : neighboring_vertices) {
+        Eigen::Vector3d v(vertex->point()[0], vertex->point()[1], vertex->point()[2]);
+        if ((v - center).squaredNorm() < radius * radius) {
+            return false;
+        }
+    }
+    return true;
+}
+
+void get_incident_cells(Edge &edge, std::vector<Delaunay::Full_cell_handle> &cell_neighbors) {
+    Delaunay::Vertex_handle vertex1 = edge.vertex1;
+    Delaunay::Vertex_handle vertex2 = edge.vertex2;
+
+    std::set<Delaunay::Full_cell_handle> visited_cells;
+    std::queue<Delaunay::Full_cell_handle> cell_queue;
+
+    Delaunay::Full_cell_handle v1_full_cell = vertex1->full_cell();
+    Delaunay::Full_cell_handle v2_full_cell = vertex2->full_cell();
+
+    cell_queue.push(v1_full_cell);
+    cell_queue.push(v2_full_cell);
+
+    while (!cell_queue.empty()) {
+        Delaunay::Full_cell_handle current_cell = cell_queue.front();
+        cell_queue.pop();
+
+        if (!visited_cells.contains(current_cell)) {
+            visited_cells.insert(current_cell);
+            for (int i = 0; i < current_cell->maximal_dimension() + 1; ++i) {
+                Delaunay::Full_cell_handle neighbor = current_cell->neighbor(i);
+                if (neighbor->has_vertex(vertex1) || neighbor->has_vertex(vertex2)) {
+                    cell_neighbors.push_back(neighbor);
+                    cell_queue.push(neighbor);
+                }
+            }
+        }
+    }
 }
 
 void get_facet_vertices(const Delaunay &delaunay, const Delaunay::Facet_iterator &facet,

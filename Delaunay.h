@@ -33,7 +33,9 @@ void insert_points(std::vector<Point> &points, Delaunay &delaunay);
 
 bool is_index_two_critical_point(const std::vector<Delaunay::Vertex_handle> &facet_vertices);
 
-bool is_gabriel(Edge);
+bool is_gabriel(Edge &edge);
+
+void get_incident_cells(Edge &edge, std::vector<Delaunay::Full_cell_handle> &cell_neighbors);
 
 void get_facet_vertices(
     const Delaunay &delaunay,
