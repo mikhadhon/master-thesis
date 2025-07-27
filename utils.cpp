@@ -1,3 +1,5 @@
+#include <random>
+
 #include "utils.h"
 #include "Delaunay.h"
 
@@ -29,7 +31,7 @@ void write_faces_to_vector(
             size_t face_vertex_idx = 0;
             std::vector<Delaunay::Vertex_handle> face_vertices;
 
-            getFacetVertices(delaunay, facet, face_vertices);
+            get_facet_vertices(delaunay, facet, face_vertices);
             if (face_vertices.size() == delaunay.maximal_dimension()) {
                 for (int i = 0; i < delaunay.maximal_dimension(); ++i) {
                     face[face_vertex_idx++] = vertex_to_index[face_vertices[i]];
@@ -64,5 +66,24 @@ void generate_circle(int nsamples, int normal_windings, Eigen::Matrix<double, Ei
             N1.row(i) = N1.row(i) * R.transpose();
             N2.row(i) = N2.row(i) * R.transpose();
         }
+    }
+}
+
+void generate_torus(int count, double radius, double rot_radius, std::vector<Delaunay::Point> &torus_samples) {
+    std::random_device rd{};
+    std::mt19937 gen{ rd() };
+
+    //std::normal_distribution<> angle_t{M_PI, M_PI_2}, angle_p{M_PI, M_PI_2};
+    std::uniform_real_distribution<> angle_t{ 0, 2 * M_PI }, angle_p{ 0, 2 * M_PI };
+
+    for (int i = 0; i < count; i++) {
+        double t = angle_t(gen);
+        double p = angle_p(gen);
+
+        double x = (rot_radius + radius * cos(p)) * cos(t);
+        double y = (rot_radius + radius * cos(p)) * sin(t);
+        double z = radius * sin(p);
+
+        torus_samples.push_back(Delaunay::Point(x, y, z));
     }
 }

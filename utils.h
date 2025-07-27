@@ -21,4 +21,6 @@ void extract_edges(Delaunay &delaunay, std::map<Delaunay::Vertex_handle, size_t>
 
 void generate_circle(int nsamples, int normal_windings, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3> &N1, Eigen::Matrix<double, Eigen::Dynamic, 3>  &N2, Eigen::Matrix<double, Eigen::Dynamic, 3> &T);
 
+void generate_torus(int count, double radius, double rot_radius, std::vector<Delaunay::Point> &torus_samples);
+
 #endif

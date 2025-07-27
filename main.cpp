@@ -19,23 +19,24 @@ int main() {
     Eigen::Matrix<double, Eigen::Dynamic, 3> N2;
     Eigen::Matrix<double, Eigen::Dynamic, 3> T;
 
-    generate_circle(100, 0, V, N1, N2, T);
+    // generate_circle(100, 0, V, N1, N2, T);
 
     Delaunay delaunay3D(3);
 
     std::vector<Delaunay::Point> points;
+    generate_torus(1000, 0.7, 1, points);
 
-    for (int i = 0; i < V.rows(); i++) {
-        Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));
-        points.push_back(p);
-    }
+    // for (int i = 0; i < V.rows(); i++) {
+    //     Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));
+    //     points.push_back(p);
+    // }
 
     // for (auto & sample : samples) {
     //     Delaunay::Point p(&sample[0], &sample[3]);
     //     points.push_back(p);
     // }
 
-    insertPoints(points, delaunay3D);
+    insert_points(points, delaunay3D);
 
     std::cout << "Triangulation dimension: " << delaunay3D.current_dimension() << std::endl;
 

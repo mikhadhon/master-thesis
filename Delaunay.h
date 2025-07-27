@@ -11,15 +11,15 @@ typedef K::FT FT;
 
 typedef CGAL::Delaunay_triangulation<CGAL::Epick_d<Dimension>> Delaunay;
 
-void insertPoints(std::vector<Point> &points, Delaunay &delaunay);
+void insert_points(std::vector<Point> &points, Delaunay &delaunay);
 
-void indexTwoCriticalPoint(
+void index_two_critical_point(
     const Delaunay &delaunay,
     const Delaunay::Facet_iterator &facet,
     Point &criticalPoint
 );
 
-void getFacetVertices(
+void get_facet_vertices(
     const Delaunay &delaunay,
     const Delaunay::Facet_iterator &facet,
     std::vector<Delaunay::Vertex_handle> &facet_vertices

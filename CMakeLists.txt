@@ -19,6 +19,8 @@ add_executable(
         Delaunay.h
         utils.cpp
         utils.h
+        FlowComplex.cpp
+        FlowComplex.h
 )
 
 find_package(CGAL CONFIG REQUIRED)

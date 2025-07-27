@@ -7,7 +7,7 @@ typedef Linear_algebra::Matrix Matrix;
 typedef Linear_algebra::Vector Vector;
 typedef Linear_algebra::RT RT;
 
-void insertPoints(std::vector<Point> &points, Delaunay &delaunay) {
+void insert_points(std::vector<Point> &points, Delaunay &delaunay) {
     Delaunay::Vertex_handle hint;
     int i = 0;
     for (auto it = points.begin(); it != points.end(); ++it) {
@@ -24,15 +24,15 @@ void insertPoints(std::vector<Point> &points, Delaunay &delaunay) {
     }
 }
 
-void indexTwoCriticalPoint(const Delaunay &delaunay, const Delaunay::Facet_iterator &facet, Point &criticalPoint) {
+void index_two_critical_point(const Delaunay &delaunay, const Delaunay::Facet_iterator &facet, Point &criticalPoint) {
     std::vector<Delaunay::Vertex_handle> facet_vertices;
-    getFacetVertices(delaunay, facet, facet_vertices);
+    get_facet_vertices(delaunay, facet, facet_vertices);
 
     //calc critical point
     std::cout << "calc critical point" << std::endl;
 }
 
-void getFacetVertices(const Delaunay &delaunay, const Delaunay::Facet_iterator &facet,
+void get_facet_vertices(const Delaunay &delaunay, const Delaunay::Facet_iterator &facet,
     std::vector<Delaunay::Vertex_handle> &facet_vertices
     ) {
     const int dimension = facet->full_cell()->maximal_dimension();
@@ -72,7 +72,7 @@ void extract_edges(Delaunay &delaunay, std::map<Delaunay::Vertex_handle, size_t>
     for (auto facet = delaunay.facets_begin(); facet != delaunay.facets_end(); ++facet) {
         if (!delaunay.is_infinite(*facet)) {
             std::vector<Delaunay::Vertex_handle> face_vertices;
-            getFacetVertices(delaunay, facet, face_vertices);
+            get_facet_vertices(delaunay, facet, face_vertices);
             if (face_vertices.size() == 2) {
                 unique_edges.insert(Edge(face_vertices[0], face_vertices[1]));
             }
