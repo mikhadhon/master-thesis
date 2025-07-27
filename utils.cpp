@@ -87,3 +87,15 @@ void generate_torus(int count, double radius, double rot_radius, std::vector<Del
         torus_samples.push_back(Delaunay::Point(x, y, z));
     }
 }
+
+//circumcircle calculating without cross-product
+void circumcircle(Eigen::Vector3d &i, Eigen::Vector3d &j, Eigen::Vector3d &l, Eigen::Vector3d &center, double &radius) {
+    const Eigen::Vector3d	a = i - l;
+    const Eigen::Vector3d b = j - l;
+
+    const double cos_theta = (a.dot(b)) / (a.norm() * b.norm());
+    radius = ((a - b).norm()) / (2 * sin(acos(cos_theta)));
+
+    const Eigen::Vector3d helper_term = (pow(a.norm(), 2) * b - pow(b.norm(), 2) * a);
+    center = ((helper_term.dot(b) * a - helper_term.dot(a) * b) / (2 * (pow(a.norm(), 2) * pow(b.norm(), 2) - pow(a.dot(b), 2)))) + l;
+}
