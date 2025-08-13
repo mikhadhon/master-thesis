@@ -3,6 +3,28 @@
 #include "utils.h"
 #include "Delaunay.h"
 
+void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &points) {
+    std::random_device rd{};
+    std::mt19937 gen{ rd() };
+
+    std::uniform_real_distribution<> angle_t{ 0, 2 * M_PI }, angle_p{ 0, 2 * M_PI };
+    Eigen::MatrixXd sphere_samples(count, 3);
+
+    for (int i = 0; i < count; i++) {
+        double p = angle_t(gen);
+        double q = angle_p(gen);
+
+        double x = radius * sin(p) * cos(q);
+        double y = radius * sin(p) * sin(q);
+        double z = radius * cos(p);
+
+        sphere_samples.row(i) = Eigen::Vector3d(x, y, z).transpose();
+    }
+    for (int i = 0; i < sphere_samples.rows(); i++) {
+        points.push_back(Delaunay::Point(sphere_samples.row(i)[0], sphere_samples.row(i)[1], sphere_samples.row(i)[2] ));
+    }
+}
+
 void map_vertices_to_vector(
     Delaunay &delaunay,
     std::vector<std::array<double, 3> > &vertices,
@@ -90,11 +112,11 @@ void generate_torus(int count, double radius, double rot_radius, std::vector<Del
 
 //circumcircle calculating without cross-product
 void circumcircle(Eigen::Vector3d &i, Eigen::Vector3d &j, Eigen::Vector3d &l, Eigen::Vector3d &center, double &radius) {
-    const Eigen::Vector3d	a = i - l;
+    const Eigen::Vector3d a = i - l;
     const Eigen::Vector3d b = j - l;
 
     const double cos_theta = (a.dot(b)) / (a.norm() * b.norm());
-    radius = ((a - b).norm()) / (2 * sin(acos(cos_theta)));
+    radius = ((i - j).norm()) / (2 * sin(acos(cos_theta)));
 
     const Eigen::Vector3d helper_term = (pow(a.norm(), 2) * b - pow(b.norm(), 2) * a);
     center = ((helper_term.dot(b) * a - helper_term.dot(a) * b) / (2 * (pow(a.norm(), 2) * pow(b.norm(), 2) - pow(a.dot(b), 2)))) + l;

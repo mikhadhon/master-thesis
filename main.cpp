@@ -6,6 +6,8 @@
 #include "FlowComplex.h"
 #include "utils.h"
 #include "polyscope/curve_network.h"
+#include "polyscope/point_cloud.h"
+
 
 int main() {
     double samples[][3] = {
@@ -25,7 +27,9 @@ int main() {
     Delaunay delaunay3D(3);
 
     std::vector<Delaunay::Point> points;
-    generate_torus(1000, 0.7, 1, points);
+    generate_torus(100, 0.5, 1, points);
+    // gen_sphere_sample(50, 1, points);
+
 
     // for (int i = 0; i < V.rows(); i++) {
     //     Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));
@@ -45,14 +49,16 @@ int main() {
 
     std::vector<std::array<double, 3> > vertices;
     std::vector<std::array<size_t, 3> > faces;
+    std::vector<std::array<size_t, 3> > reconstructed_faces;
     std::vector<std::array<size_t, 2> > edges;
     std::map<Delaunay::Vertex_handle, size_t> vertex_to_index;
 
     map_vertices_to_vector(delaunay3D, vertices, vertex_to_index);
-    // write_faces_to_vector(delaunay3D, faces, vertex_to_index);
+    write_faces_to_vector(delaunay3D, faces, vertex_to_index);
     extract_edges(delaunay3D, vertex_to_index, edges);
 
-    flow_complex(delaunay3D, vertices, faces, vertex_to_index);
+    std::vector<Eigen::Vector3d> centers;
+    flow_complex(delaunay3D, vertices, reconstructed_faces, vertex_to_index, centers);
 
     std::cout << "Number of vertices: " << vertices.size() << std::endl;
     std::cout << "Number of faces: " << faces.size() << std::endl;
@@ -60,6 +66,8 @@ int main() {
 
     if (!faces.empty()) {
         auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
+        auto *psRecMesh = polyscope::registerSurfaceMesh("rec mesh", vertices, reconstructed_faces);
+        auto *pcCloud = polyscope::registerPointCloud("centers", centers);
     }
     if (!edges.empty()) {
         auto *psCurve = polyscope::registerCurveNetwork("delaunay vertices", vertices, edges);

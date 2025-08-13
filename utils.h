@@ -5,6 +5,8 @@
 
 #include "Delaunay.h"
 
+void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &points);
+
 void map_vertices_to_vector(
     Delaunay &delaunay,
     std::vector<std::array<double, 3> > &vertices,

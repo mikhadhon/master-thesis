@@ -30,7 +30,7 @@ bool is_index_two_critical_point(const std::vector<Delaunay::Vertex_handle> &fac
     Eigen::Vector3d j(facet_vertices[1]->point()[0], facet_vertices[1]->point()[1], facet_vertices[1]->point()[2]);
     Eigen::Vector3d l(facet_vertices[2]->point()[0], facet_vertices[2]->point()[1], facet_vertices[2]->point()[2]);
 
-    return i.dot(j) > 0 && i.dot(l) > 0 && j.dot(l) > 0;
+    return (j-i).dot(l-i) > 0 && (i-j).dot(l-j) > 0 && (i-l).dot(j-l) > 0;
 }
 
 bool is_gabriel(Edge &edge) {
@@ -56,6 +56,7 @@ bool is_gabriel(Edge &edge) {
             return false;
         }
     }
+
     return true;
 }
 

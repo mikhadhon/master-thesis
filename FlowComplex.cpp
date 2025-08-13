@@ -4,7 +4,7 @@
 #include "FlowComplex.h"
 #include "utils.h"
 
-void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &vertices, std::vector<std::array<size_t, 3>> &faces, std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index) {
+void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &vertices, std::vector<std::array<size_t, 3>> &faces, std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index, std::vector<Eigen::Vector3d> &centers) {
     std::map<std::array<double, 3>, size_t> fc_vertex_to_index;
     int vertex_count = vertices.size();
 
@@ -22,9 +22,9 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
 
             circumcircle(i, j, l, center, radius);
 
-            edge_queue.push(std::make_pair(center, Edge(facet_vertices[0], facet_vertices[1])));
-            edge_queue.push(std::make_pair(center, Edge(facet_vertices[0], facet_vertices[2])));
-            edge_queue.push(std::make_pair(center, Edge(facet_vertices[1], facet_vertices[2])));
+            edge_queue.emplace(center, Edge(facet_vertices[0], facet_vertices[1]));
+            edge_queue.emplace(center, Edge(facet_vertices[0], facet_vertices[2]));
+            edge_queue.emplace(center, Edge(facet_vertices[1], facet_vertices[2]));
 
             while (!edge_queue.empty()) {
                 auto current = edge_queue.front();
@@ -41,6 +41,7 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                     fc_face[1] = vertex_to_index[current_edge.vertex2];
                     fc_face[2] = fc_vertex_to_index[fc_center];
                     faces.push_back(fc_face);
+                    centers.push_back(center);
                 }
             }
         }
