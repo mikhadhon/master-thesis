@@ -27,7 +27,7 @@ int main() {
     Delaunay delaunay3D(3);
 
     std::vector<Delaunay::Point> points;
-    generate_torus(100, 0.5, 1, points);
+    generate_torus(1000, 0.5, 1, points);
     // gen_sphere_sample(50, 1, points);
 
 
@@ -74,13 +74,6 @@ int main() {
     }
 
     polyscope::show();
-
-    // Point criticalPoint;
-    // for (auto facet = delaunay3D.facets_begin(); facet != delaunay3D.facets_end(); ++facet) {
-    //     if (!delaunay3D.is_infinite(*facet)) {
-    //         indexTwoCriticalPoint(delaunay3D, facet, criticalPoint);
-    //     }
-    // }
 
     return 0;
 }

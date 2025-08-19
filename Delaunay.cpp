@@ -35,7 +35,7 @@ bool is_index_two_critical_point(const std::vector<Delaunay::Vertex_handle> &fac
 
 bool is_gabriel(Edge &edge) {
     std::vector<Delaunay::Full_cell_handle> cell_neighbors;
-    get_incident_cells(edge, cell_neighbors);
+    get_incident_cells_to_vertices(edge, cell_neighbors);
     std::set<Delaunay::Vertex_handle> neighboring_vertices;
 
     for (auto cell : cell_neighbors) {
@@ -60,7 +60,39 @@ bool is_gabriel(Edge &edge) {
     return true;
 }
 
-void get_incident_cells(Edge &edge, std::vector<Delaunay::Full_cell_handle> &cell_neighbors) {
+void get_incident_cells_to_vertices(Edge &edge, std::vector<Delaunay::Full_cell_handle> &cell_neighbors) {
+    Delaunay::Vertex_handle vertex1 = edge.vertex1;
+    Delaunay::Vertex_handle vertex2 = edge.vertex2;
+
+    std::set<Delaunay::Full_cell_handle> visited_cells;
+    std::queue<std::pair<Delaunay::Vertex_handle, Delaunay::Full_cell_handle>> cell_queue;
+
+    Delaunay::Full_cell_handle v1_full_cell = vertex1->full_cell();
+    Delaunay::Full_cell_handle v2_full_cell = vertex2->full_cell();
+
+    cell_queue.push(std::make_pair(vertex1, v1_full_cell));
+    cell_queue.push(std::make_pair(vertex2, v2_full_cell));
+
+    visited_cells.insert(v1_full_cell);
+    visited_cells.insert(v2_full_cell);
+
+    while (!cell_queue.empty()) {
+        Delaunay::Vertex_handle current_vertex = cell_queue.front().first;
+        Delaunay::Full_cell_handle current_cell = cell_queue.front().second;
+        cell_queue.pop();
+
+        for (int i = 0; i < current_cell->maximal_dimension() + 1; ++i) {
+            Delaunay::Full_cell_handle neighbor = current_cell->neighbor(i);
+            if (neighbor->has_vertex(current_vertex) && !visited_cells.contains(neighbor)) {
+                visited_cells.insert(neighbor);
+                cell_neighbors.push_back(neighbor);
+                cell_queue.push(std::make_pair(current_vertex, neighbor));
+            }
+        }
+    }
+}
+
+void get_incident_cells_to_edge(Edge &edge, std::vector<Delaunay::Full_cell_handle> &incident_cells) {
     Delaunay::Vertex_handle vertex1 = edge.vertex1;
     Delaunay::Vertex_handle vertex2 = edge.vertex2;
 
@@ -70,21 +102,28 @@ void get_incident_cells(Edge &edge, std::vector<Delaunay::Full_cell_handle> &cel
     Delaunay::Full_cell_handle v1_full_cell = vertex1->full_cell();
     Delaunay::Full_cell_handle v2_full_cell = vertex2->full_cell();
 
+    incident_cells.push_back(v1_full_cell);
+    if (v1_full_cell != v2_full_cell)
+    {
+        incident_cells.push_back(v2_full_cell);
+    }
+
     cell_queue.push(v1_full_cell);
     cell_queue.push(v2_full_cell);
+
+    visited_cells.insert(v1_full_cell);
+    visited_cells.insert(v2_full_cell);
 
     while (!cell_queue.empty()) {
         Delaunay::Full_cell_handle current_cell = cell_queue.front();
         cell_queue.pop();
 
-        if (!visited_cells.contains(current_cell)) {
-            visited_cells.insert(current_cell);
-            for (int i = 0; i < current_cell->maximal_dimension() + 1; ++i) {
-                Delaunay::Full_cell_handle neighbor = current_cell->neighbor(i);
-                if (neighbor->has_vertex(vertex1) || neighbor->has_vertex(vertex2)) {
-                    cell_neighbors.push_back(neighbor);
-                    cell_queue.push(neighbor);
-                }
+        for (int i = 0; i < current_cell->maximal_dimension() + 1; ++i) {
+            Delaunay::Full_cell_handle neighbor = current_cell->neighbor(i);
+            if (neighbor->has_vertex(vertex1) && neighbor->has_vertex(vertex2) && !visited_cells.contains(neighbor)) {
+                visited_cells.insert(neighbor);
+                incident_cells.push_back(neighbor);
+                cell_queue.push(neighbor);
             }
         }
     }

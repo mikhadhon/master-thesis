@@ -43,6 +43,10 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                     faces.push_back(fc_face);
                     centers.push_back(center);
                 }
+                else {
+                    std::vector<Delaunay::Full_cell_handle> incident_delaunay_cells;
+                    get_incident_cells_to_edge(current_edge, incident_delaunay_cells);
+                }
             }
         }
     }
