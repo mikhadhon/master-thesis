@@ -27,8 +27,9 @@ int main() {
     Delaunay delaunay3D(3);
 
     std::vector<Delaunay::Point> points;
-    generate_torus(1000, 0.5, 1, points);
-    // gen_sphere_sample(50, 1, points);
+    //gen_rectangle(10, points);
+    //generate_torus(1000, 0.5, 1, points);
+    gen_sphere_sample(500, 1, points);
 
 
     // for (int i = 0; i < V.rows(); i++) {
@@ -58,7 +59,8 @@ int main() {
     extract_edges(delaunay3D, vertex_to_index, edges);
 
     std::vector<Eigen::Vector3d> centers;
-    flow_complex(delaunay3D, vertices, reconstructed_faces, vertex_to_index, centers);
+    std::vector<Eigen::Vector3d> centers2;
+    flow_complex(delaunay3D, vertices, reconstructed_faces, vertex_to_index, centers, centers2);
 
     std::cout << "Number of vertices: " << vertices.size() << std::endl;
     std::cout << "Number of faces: " << faces.size() << std::endl;
@@ -68,6 +70,7 @@ int main() {
         auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
         auto *psRecMesh = polyscope::registerSurfaceMesh("rec mesh", vertices, reconstructed_faces);
         auto *pcCloud = polyscope::registerPointCloud("centers", centers);
+        auto *pcCloud2 = polyscope::registerPointCloud("centers2", centers2);
     }
     if (!edges.empty()) {
         auto *psCurve = polyscope::registerCurveNetwork("delaunay vertices", vertices, edges);

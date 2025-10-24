@@ -92,38 +92,27 @@ void get_incident_cells_to_vertices(Edge &edge, std::vector<Delaunay::Full_cell_
     }
 }
 
-void get_incident_cells_to_edge(Edge &edge, std::vector<Delaunay::Full_cell_handle> &incident_cells) {
+void voronoi_facet_from_edge(Edge &edge, std::vector<std::pair<Delaunay::Full_cell_handle, Delaunay::Full_cell_handle>> &facet_edges, Delaunay &delaunay) {
     Delaunay::Vertex_handle vertex1 = edge.vertex1;
     Delaunay::Vertex_handle vertex2 = edge.vertex2;
 
-    std::set<Delaunay::Full_cell_handle> visited_cells;
-    std::queue<Delaunay::Full_cell_handle> cell_queue;
+    std::vector<Delaunay::Full_cell_handle> v1_incident;
+    delaunay.incident_full_cells(vertex1, std::back_inserter(v1_incident));
 
-    Delaunay::Full_cell_handle v1_full_cell = vertex1->full_cell();
-    Delaunay::Full_cell_handle v2_full_cell = vertex2->full_cell();
+    std::set<Delaunay::Full_cell_handle> both_incident;
 
-    incident_cells.push_back(v1_full_cell);
-    if (v1_full_cell != v2_full_cell)
-    {
-        incident_cells.push_back(v2_full_cell);
+    for (auto incident_cell : v1_incident) {
+        if (incident_cell->has_vertex(vertex2)) {
+            both_incident.insert(incident_cell);
+        }
     }
 
-    cell_queue.push(v1_full_cell);
-    cell_queue.push(v2_full_cell);
-
-    visited_cells.insert(v1_full_cell);
-    visited_cells.insert(v2_full_cell);
-
-    while (!cell_queue.empty()) {
-        Delaunay::Full_cell_handle current_cell = cell_queue.front();
-        cell_queue.pop();
-
-        for (int i = 0; i < current_cell->maximal_dimension() + 1; ++i) {
-            Delaunay::Full_cell_handle neighbor = current_cell->neighbor(i);
-            if (neighbor->has_vertex(vertex1) && neighbor->has_vertex(vertex2) && !visited_cells.contains(neighbor)) {
-                visited_cells.insert(neighbor);
-                incident_cells.push_back(neighbor);
-                cell_queue.push(neighbor);
+    int d = delaunay.maximal_dimension();
+    for (auto cell : both_incident) {
+        for (int i = 0; i <= d; ++i) {
+            auto neighbor = cell->neighbor(i);
+            if (both_incident.contains(neighbor) && cell < neighbor) {
+                facet_edges.push_back(std::make_pair(neighbor, cell));
             }
         }
     }
