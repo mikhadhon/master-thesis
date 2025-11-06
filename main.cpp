@@ -69,8 +69,8 @@ int main() {
     if (!faces.empty()) {
         auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
         auto *psRecMesh = polyscope::registerSurfaceMesh("rec mesh", vertices, reconstructed_faces);
-        auto *pcCloud = polyscope::registerPointCloud("centers", centers);
-        auto *pcCloud2 = polyscope::registerPointCloud("centers2", centers2);
+        auto *pcCloud = polyscope::registerPointCloud("s'", centers);
+        auto *pcCloud2 = polyscope::registerPointCloud("s", centers2);
     }
     if (!edges.empty()) {
         auto *psCurve = polyscope::registerCurveNetwork("delaunay vertices", vertices, edges);

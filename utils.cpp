@@ -249,3 +249,41 @@ bool intersect_ray_segment(
     intersection = point_on_ray;
     return true;
 }
+
+bool is_inside_triangle(
+    const Eigen::VectorXd& p,
+    const Eigen::VectorXd& a,
+    const Eigen::VectorXd& b,
+    const Eigen::VectorXd& c
+) {
+    // Define vectors relative to vertex 'a'
+    Eigen::VectorXd v0 = b - a;
+    Eigen::VectorXd v1 = c - a;
+    Eigen::VectorXd v2 = p - a;
+
+    // Compute dot products
+    double dot00 = v0.dot(v0);
+    double dot01 = v0.dot(v1);
+    double dot11 = v1.dot(v1);
+    double dot20 = v2.dot(v0);
+    double dot21 = v2.dot(v1);
+
+    // Compute barycentric coordinates by solving the 2x2 system
+    // [ dot00 dot01 ] [ u ] = [ dot20 ]
+    // [ dot01 dot11 ] [ v ] = [ dot21 ]
+    double denom = dot00 * dot11 - dot01 * dot01;
+    if (std::abs(denom) < 1e-10) {
+        // The triangle is degenerate (collinear points).
+        // A simple collinearity check could be added here if needed.
+        return false;
+    }
+
+    double u = (dot11 * dot20 - dot01 * dot21) / denom;
+    double v = (dot00 * dot21 - dot01 * dot20) / denom;
+
+    // The third barycentric coordinate w = 1 - u - v.
+    // Check if point is in triangle:
+    // u >= 0  AND  v >= 0  AND  u + v <= 1
+    // (The last condition implies w >= 0)
+    return (u >= -1e-9) && (v >= -1e-9) && (u + v <= 1.0 + 1e-9);
+}

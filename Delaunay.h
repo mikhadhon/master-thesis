@@ -72,6 +72,8 @@ void get_incident_cells_to_vertices(Edge &edge, std::vector<Delaunay::Full_cell_
 
 void voronoi_facet_from_edge(Edge &edge, std::vector<std::pair<Delaunay::Full_cell_handle, Delaunay::Full_cell_handle>> &facet_edges, Delaunay &delaunay);
 
+void get_voronoi_facet_vertices(const Edge& edge, const Delaunay& delaunay, std::vector<Eigen::VectorXd>& facet_vertices);
+
 void get_facet_vertices(
     const Delaunay &delaunay,
     const Delaunay::Facet_iterator &facet,
@@ -79,5 +81,11 @@ void get_facet_vertices(
 );
 
 void extract_edges(Delaunay &delaunay, std::map<Delaunay::Vertex_handle, size_t> vertex_to_index, std::vector<std::array<size_t, 2>> &edges);
+
+void calculate_driver(const Eigen::VectorXd &voronoi_vertex, const Edge &delaunay_edge, Eigen::VectorXd &driver);
+
+bool is_intersection_in_facet(
+    const Eigen::VectorXd& intersection_point,
+    const std::vector<Eigen::VectorXd>& facet_vertices);
 
 #endif

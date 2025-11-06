@@ -2,6 +2,8 @@
 
 #include "Delaunay.h"
 
+#include "utils.h"
+
 typedef CGAL::Linear_algebraCd<FT> Linear_algebra;
 typedef Linear_algebra::Matrix Matrix;
 typedef Linear_algebra::Vector Vector;
@@ -118,6 +120,29 @@ void voronoi_facet_from_edge(Edge &edge, std::vector<std::pair<Delaunay::Full_ce
     }
 }
 
+void get_voronoi_facet_vertices(const Edge& edge, const Delaunay& delaunay, std::vector<Eigen::VectorXd>& facet_vertices) {
+    Delaunay::Vertex_handle vertex1 = edge.vertex1;
+    Delaunay::Vertex_handle vertex2 = edge.vertex2;
+
+    std::vector<Delaunay::Full_cell_handle> v1_incident;
+    delaunay.incident_full_cells(vertex1, std::back_inserter(v1_incident));
+
+    std::set<Delaunay::Full_cell_handle> both_incident;
+
+    for (auto incident_cell : v1_incident) {
+        if (incident_cell->has_vertex(vertex2)) {
+            both_incident.insert(incident_cell);
+        }
+    }
+
+    for (auto cell : both_incident) {
+        double radius;
+        Eigen::VectorXd center;
+        simplex_circumsphere(cell, radius, center);
+        facet_vertices.push_back(center);
+    }
+}
+
 void get_facet_vertices(const Delaunay &delaunay, const Delaunay::Facet_iterator &facet,
     std::vector<Delaunay::Vertex_handle> &facet_vertices
     ) {
@@ -149,4 +174,38 @@ void extract_edges(Delaunay &delaunay, std::map<Delaunay::Vertex_handle, size_t>
     for (const auto &edge : unique_edges) {
         edges.push_back(std::array{vertex_to_index[edge.vertex1], vertex_to_index[edge.vertex2]});
     }
+}
+
+
+void calculate_driver(const Eigen::VectorXd &voronoi_vertex, const Edge &delaunay_edge, Eigen::VectorXd &driver) {
+    Eigen::VectorXd p1 = make_point_eigen(delaunay_edge.vertex1->point());
+    Eigen::VectorXd p2 = make_point_eigen(delaunay_edge.vertex2->point());
+
+    Eigen::VectorXd line_vec = p2 - p1;
+    Eigen::VectorXd point_vec = voronoi_vertex - p1;
+
+    double t = point_vec.dot(line_vec) / line_vec.squaredNorm();
+    driver = p1 + t * line_vec;
+}
+
+bool is_intersection_in_facet(
+    const Eigen::VectorXd& intersection_point,
+    const std::vector<Eigen::VectorXd>& facet_vertices)
+{
+    if (facet_vertices.size() < 3) {
+        return false; // Not a valid polygon
+    }
+
+    // Create a fan triangulation from the first vertex
+    const Eigen::VectorXd& v0 = facet_vertices[0];
+    for (size_t i = 1; i < facet_vertices.size() - 1; ++i) {
+        const Eigen::VectorXd& v1 = facet_vertices[i];
+        const Eigen::VectorXd& v2 = facet_vertices[i + 1];
+
+        if (is_inside_triangle(intersection_point, v0, v1, v2)) {
+            return true;
+        }
+    }
+
+    return false;
 }

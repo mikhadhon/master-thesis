@@ -41,4 +41,11 @@ bool intersect_ray_segment(
     Eigen::VectorXd &intersection
     );
 
+bool is_inside_triangle(
+    const Eigen::VectorXd& p,
+    const Eigen::VectorXd& a,
+    const Eigen::VectorXd& b,
+    const Eigen::VectorXd& c
+);
+
 #endif

@@ -66,75 +66,84 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                         }
                     }
 
-                    double closest_intersection_dist = INFINITY;
-                    Voronoi_edge *closest_edge = nullptr;
-                    Eigen::VectorXd s_prime(delaunay.maximal_dimension());
-                    for (auto edge : voronoi_edges) {
-                        Eigen::VectorXd intersection(delaunay.maximal_dimension());
+                    if (!voronoi_edges.empty()) {
+                        Eigen::VectorXd driver;
+                        Eigen::VectorXd point_on_plane = voronoi_edges[0].vertex1;
+                        calculate_driver(point_on_plane, current_edge, driver);
+                        Eigen::VectorXd ray_direction = (center - driver).normalized();
 
                         Eigen::VectorXd origin = (make_point_eigen(current_edge.vertex1->point()) + make_point_eigen(current_edge.vertex2->point())) / 2;
 
-                        if (intersect_ray_segment(origin, center,edge.vertex1, edge.vertex2, intersection)) {
-                            double current_intersection_dist = (intersection - origin).norm();
-                            if (current_intersection_dist < closest_intersection_dist) {
-                                s_prime = intersection;
-                                closest_intersection_dist = current_intersection_dist;
-                                closest_edge = &edge;
+                        double debug_dist = (origin - driver).norm();
+
+                        double closest_intersection_dist = INFINITY;
+                        Voronoi_edge *closest_edge = nullptr;
+                        Eigen::VectorXd s_prime(delaunay.maximal_dimension());
+                        for (auto edge: voronoi_edges) {
+                            Eigen::VectorXd intersection(delaunay.maximal_dimension());
+
+                            if (intersect_ray_segment(driver, center, edge.vertex1, edge.vertex2, intersection)) {
+                                double current_intersection_dist = (intersection - driver).norm();
+                                if (current_intersection_dist < closest_intersection_dist) {
+                                    s_prime = intersection;
+                                    closest_intersection_dist = current_intersection_dist;
+                                    closest_edge = &edge;
+                                }
                             }
                         }
-                    }
 
-                    if (closest_intersection_dist < INFINITY) {
-                        std::array<size_t, 3> fc_face1{}, fc_face2{};
-                        std::array fc_center = {center[0], center[1], center[2]};
-                        std::array fc_s_prime = {s_prime[0], s_prime[1], s_prime[2]};
-                        auto fc_index = fc_vertex_to_index.find(fc_center);
-                        if (fc_index == fc_vertex_to_index.end()) {
-                            fc_vertex_to_index[fc_center] = vertex_count++;
-                        }
-                        auto fc_s_prime_index = fc_vertex_to_index.find(fc_s_prime);
-                        if (fc_s_prime_index == fc_vertex_to_index.end()) {
-                            fc_vertex_to_index[fc_s_prime] = vertex_count++;
-                        }
-                        fc_face1[0] = vertex_to_index[current_edge.vertex1];
-                        fc_face1[1] = fc_vertex_to_index[fc_s_prime];
-                        fc_face1[2] = fc_vertex_to_index[fc_center];
-                        fc_face2[0] = vertex_to_index[current_edge.vertex2];
-                        fc_face2[1] = fc_vertex_to_index[fc_s_prime];
-                        fc_face2[2] = fc_vertex_to_index[fc_center];
-                        faces.push_back(fc_face1);
-                        faces.push_back(fc_face2);
-                        centers2.push_back(center);
-                        centers.push_back(s_prime);
-
-                        std::vector<Delaunay::Vertex_handle> next_face;
-                        for (int i = 0; i <= delaunay.maximal_dimension(); i++) {
-                            if (closest_edge->cell2->has_vertex(closest_edge->cell1->vertex(i))) {
-                                next_face.push_back(closest_edge->cell1->vertex(i));
+                        if (closest_intersection_dist < INFINITY) {
+                            std::array<size_t, 3> fc_face1{}, fc_face2{};
+                            std::array fc_center = {center[0], center[1], center[2]};
+                            std::array fc_s_prime = {s_prime[0], s_prime[1], s_prime[2]};
+                            auto fc_index = fc_vertex_to_index.find(fc_center);
+                            if (fc_index == fc_vertex_to_index.end()) {
+                                fc_vertex_to_index[fc_center] = vertex_count++;
                             }
-                        }
-                        Eigen::VectorXd next_center(delaunay.maximal_dimension());
-                        double next_radius;
-                        Eigen::Vector3d next_i(next_face[0]->point()[0], next_face[0]->point()[1], next_face[0]->point()[2]);
-                        Eigen::Vector3d next_j(next_face[1]->point()[0], next_face[1]->point()[1], next_face[1]->point()[2]);
-                        Eigen::Vector3d next_l(next_face[2]->point()[0], next_face[2]->point()[1], next_face[2]->point()[2]);
+                            auto fc_s_prime_index = fc_vertex_to_index.find(fc_s_prime);
+                            if (fc_s_prime_index == fc_vertex_to_index.end()) {
+                                fc_vertex_to_index[fc_s_prime] = vertex_count++;
+                            }
+                            fc_face1[0] = vertex_to_index[current_edge.vertex1];
+                            fc_face1[1] = fc_vertex_to_index[fc_s_prime];
+                            fc_face1[2] = fc_vertex_to_index[fc_center];
+                            fc_face2[0] = vertex_to_index[current_edge.vertex2];
+                            fc_face2[1] = fc_vertex_to_index[fc_s_prime];
+                            fc_face2[2] = fc_vertex_to_index[fc_center];
+                            faces.push_back(fc_face1);
+                            faces.push_back(fc_face2);
+                            centers2.push_back(center);
+                            centers.push_back(s_prime);
 
-                        triangle_circumcircle(next_i, next_j, next_l, next_center, next_radius);
+                            std::vector<Delaunay::Vertex_handle> next_face;
+                            for (int i = 0; i <= delaunay.maximal_dimension(); i++) {
+                                if (closest_edge->cell2->has_vertex(closest_edge->cell1->vertex(i))) {
+                                    next_face.push_back(closest_edge->cell1->vertex(i));
+                                }
+                            }
+                            Eigen::VectorXd next_center(delaunay.maximal_dimension());
+                            double next_radius;
+                            Eigen::Vector3d next_i(next_face[0]->point()[0], next_face[0]->point()[1], next_face[0]->point()[2]);
+                            Eigen::Vector3d next_j(next_face[1]->point()[0], next_face[1]->point()[1], next_face[1]->point()[2]);
+                            Eigen::Vector3d next_l(next_face[2]->point()[0], next_face[2]->point()[1], next_face[2]->point()[2]);
 
-                        for (int i = 0; i < delaunay.maximal_dimension(); i++) {
-                            for (int j = i + 1; j < delaunay.maximal_dimension(); j++) {
-                                Edge new_edge(next_face[i], next_face[j]);
-                                if (!(new_edge == current_edge) && !visited.contains(new_edge)) {
-                                    edge_queue.emplace(std::make_pair(next_center, new_edge));
-                                    visited.insert(new_edge);
+                            triangle_circumcircle(next_i, next_j, next_l, next_center, next_radius);
+
+                            for (int i = 0; i < delaunay.maximal_dimension(); i++) {
+                                for (int j = i + 1; j < delaunay.maximal_dimension(); j++) {
+                                    Edge new_edge(next_face[i], next_face[j]);
+                                    if (!(new_edge == current_edge) && !visited.contains(new_edge)) {
+                                        edge_queue.emplace(std::make_pair(next_center, new_edge));
+                                        //visited.insert(new_edge);
+                                    }
                                 }
                             }
                         }
                     }
                 }
+                }
             }
         }
-    }
 
     vertices.resize(vertex_count);
     for (auto fc_vertex : fc_vertex_to_index) {
