@@ -62,6 +62,10 @@ struct Voronoi_edge {
     }
 };
 
+struct Voronoi_face {
+    std::vector<Voronoi_edge> voronoi_edges;
+};
+
 void insert_points(std::vector<Point> &points, Delaunay &delaunay);
 
 bool is_index_two_critical_point(const std::vector<Delaunay::Vertex_handle> &facet_vertices);
@@ -70,7 +74,7 @@ bool is_gabriel(Edge &edge);
 
 void get_incident_cells_to_vertices(Edge &edge, std::vector<Delaunay::Full_cell_handle> &cell_neighbors);
 
-void voronoi_facet_from_edge(Edge &edge, std::vector<std::pair<Delaunay::Full_cell_handle, Delaunay::Full_cell_handle>> &facet_edges, Delaunay &delaunay);
+void voronoi_facet_from_edge(Edge &edge, Voronoi_face &voronoi_face, Delaunay &delaunay);
 
 void get_voronoi_facet_vertices(const Edge& edge, const Delaunay& delaunay, std::vector<Eigen::VectorXd>& facet_vertices);
 

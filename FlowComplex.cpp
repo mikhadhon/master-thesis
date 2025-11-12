@@ -51,24 +51,12 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                     centers2.push_back(center);
                 }
                 else {
-                    std::vector<std::pair<Delaunay::Full_cell_handle, Delaunay::Full_cell_handle>> neighboring_cells;
-                    voronoi_facet_from_edge(current_edge, neighboring_cells, delaunay);
+                    Voronoi_face voronoi_face;
+                    voronoi_facet_from_edge(current_edge, voronoi_face, delaunay);
 
-                    std::vector<Voronoi_edge> voronoi_edges;
-
-                    for (auto cell_pair : neighboring_cells) {
-                        if (!delaunay.is_infinite(cell_pair.first) && !delaunay.is_infinite(cell_pair.second)) {
-                            double radius1, radius2;
-                            Eigen::VectorXd center1, center2;
-                            simplex_circumsphere(cell_pair.first, radius1, center1);
-                            simplex_circumsphere(cell_pair.second, radius2, center2);
-                            voronoi_edges.push_back(Voronoi_edge(center1, center2, cell_pair.first, cell_pair.second));
-                        }
-                    }
-
-                    if (!voronoi_edges.empty()) {
+                    if (!voronoi_face.voronoi_edges.empty()) {
                         Eigen::VectorXd driver;
-                        Eigen::VectorXd point_on_plane = voronoi_edges[0].vertex1;
+                        Eigen::VectorXd point_on_plane = voronoi_face.voronoi_edges[0].vertex1;
                         calculate_driver(point_on_plane, current_edge, driver);
                         Eigen::VectorXd ray_direction = (center - driver).normalized();
 
@@ -79,7 +67,7 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                         double closest_intersection_dist = INFINITY;
                         Voronoi_edge *closest_edge = nullptr;
                         Eigen::VectorXd s_prime(delaunay.maximal_dimension());
-                        for (auto edge: voronoi_edges) {
+                        for (auto edge: voronoi_face.voronoi_edges) {
                             Eigen::VectorXd intersection(delaunay.maximal_dimension());
 
                             if (intersect_ray_segment(driver, center, edge.vertex1, edge.vertex2, intersection)) {

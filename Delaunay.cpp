@@ -94,7 +94,7 @@ void get_incident_cells_to_vertices(Edge &edge, std::vector<Delaunay::Full_cell_
     }
 }
 
-void voronoi_facet_from_edge(Edge &edge, std::vector<std::pair<Delaunay::Full_cell_handle, Delaunay::Full_cell_handle>> &facet_edges, Delaunay &delaunay) {
+void voronoi_facet_from_edge(Edge &edge, Voronoi_face &voronoi_face, Delaunay &delaunay) {
     Delaunay::Vertex_handle vertex1 = edge.vertex1;
     Delaunay::Vertex_handle vertex2 = edge.vertex2;
 
@@ -113,8 +113,14 @@ void voronoi_facet_from_edge(Edge &edge, std::vector<std::pair<Delaunay::Full_ce
     for (auto cell : both_incident) {
         for (int i = 0; i <= d; ++i) {
             auto neighbor = cell->neighbor(i);
-            if (both_incident.contains(neighbor) && cell < neighbor) {
-                facet_edges.push_back(std::make_pair(neighbor, cell));
+            if (both_incident.contains(neighbor)) {
+                double radius1, radius2;
+                Eigen::VectorXd voronoi_vertex1, voronoi_vertex2;
+
+                simplex_circumsphere(cell, radius1, voronoi_vertex1);
+                simplex_circumsphere(neighbor, radius2, voronoi_vertex2);
+
+                voronoi_face.voronoi_edges.push_back(Voronoi_edge(voronoi_vertex1, voronoi_vertex2, cell, neighbor));
             }
         }
     }
