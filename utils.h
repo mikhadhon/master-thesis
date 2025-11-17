@@ -29,9 +29,18 @@ void generate_circle(int nsamples, int normal_windings, Eigen::Matrix<double, Ei
 
 void generate_torus(int count, double radius, double rot_radius, std::vector<Delaunay::Point> &torus_samples);
 
-void triangle_circumcircle(Eigen::Vector3d &i, Eigen::Vector3d &j, Eigen::Vector3d &l, Eigen::VectorXd &center, double &radius);
+void triangle_circumcircle(Eigen::VectorXd &i, Eigen::VectorXd &j, Eigen::VectorXd &l, Eigen::VectorXd &center, double &radius);
 
 void simplex_circumsphere(Delaunay::Full_cell_handle simplex, double &radius, Eigen::VectorXd &center);
+
+bool intersect_triangle_segement(
+    Voronoi_vertex &segement_start,
+    Voronoi_vertex &segement_end,
+    Eigen::VectorXd &triangle_v0,
+    Eigen::VectorXd &triangle_v1,
+    Eigen::VectorXd &triangle_v2,
+    Eigen::VectorXd &intersection
+    );
 
 bool intersect_ray_segment(
     Eigen::VectorXd &ray_origin,

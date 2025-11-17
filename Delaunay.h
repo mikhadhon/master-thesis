@@ -37,29 +37,20 @@ inline bool lexicographic_less_vector(const Eigen::VectorXd &a, const Eigen::Vec
     }
 }
 
+struct Voronoi_vertex {
+    bool is_infinite;
+    Eigen::VectorXd point;
+};
+
 struct Voronoi_edge {
-    Eigen::VectorXd vertex1;
-    Eigen::VectorXd vertex2;
+    Voronoi_vertex vertex1;
+    Voronoi_vertex vertex2;
 
     Delaunay::Full_cell_handle cell1;
     Delaunay::Full_cell_handle cell2;
 
 
-    Voronoi_edge(Eigen::VectorXd vertex1, Eigen::VectorXd vertex2, Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2) : vertex1(vertex1), vertex2(vertex2), cell1(cell1), cell2(cell2) {}
-
-    bool operator==(const Voronoi_edge & other) const {
-        return (vertex1 == other.vertex1 && vertex2 == other.vertex2) ||
-            (vertex1 == other.vertex2 && vertex2 == other.vertex1);
-    }
-
-    bool operator<(const Voronoi_edge& other) const {
-        auto this_canonical = lexicographic_less_vector(vertex1, vertex2) ? std::make_pair(vertex1, vertex2) : std::make_pair(vertex2, vertex1);
-        auto other_canonical = lexicographic_less_vector(other.vertex1, other.vertex2) ? std::make_pair(other.vertex1, other.vertex2) : std::make_pair(other.vertex2, other.vertex1);
-        if (this_canonical.first == other_canonical.first) {
-            return lexicographic_less_vector(this_canonical.second, other_canonical.second);
-        }
-        return lexicographic_less_vector(this_canonical.first, other_canonical.first);
-    }
+    Voronoi_edge(Eigen::VectorXd vertex1, bool v1_infinite, Eigen::VectorXd vertex2, bool v2_infinite, Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2) : vertex1(v1_infinite, vertex1), vertex2(v2_infinite, vertex2), cell1(cell1), cell2(cell2) {}
 };
 
 struct Voronoi_face {

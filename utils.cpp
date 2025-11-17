@@ -2,6 +2,7 @@
 
 #include "utils.h"
 #include "Delaunay.h"
+#include "polyscope/render/engine.h"
 
 Point make_point(Eigen::Vector3d &eigen_point) {
     double coords[3] = {eigen_point[0], eigen_point[1], eigen_point[2]};
@@ -22,16 +23,19 @@ void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &p
     std::mt19937 gen{ rd() };
 
     std::uniform_real_distribution<> angle_t{ 0, 2 * M_PI }, angle_p{ 0, 2 * M_PI };
-    std::uniform_real_distribution<> noise{ -0.01, 0.01 };
+    std::uniform_real_distribution<> v_dist{-1.0, 1.0};
+    std::uniform_real_distribution<> noise{ -0.000001, 0.000001 };
     Eigen::MatrixXd sphere_samples(count, 3);
 
     for (int i = 0; i < count; i++) {
         double p = angle_t(gen);
-        double q = angle_p(gen);
+        double q = v_dist(gen);
 
-        double x = radius * sin(p) * cos(q) + noise(gen);
-        double y = radius * sin(p) * sin(q) + noise(gen);
-        double z = radius * cos(p) + noise(gen);
+        double horizontal_radius = sqrt(1 - q * q);
+
+        double x = radius * horizontal_radius * cos(p) + noise(gen);
+        double y = radius * horizontal_radius * sin(p) + noise(gen);
+        double z = radius * q + noise(gen);
 
         sphere_samples.row(i) = Eigen::Vector3d(x, y, z).transpose();
     }
@@ -109,7 +113,6 @@ void write_faces_to_vector(
     std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index
 ) {
     for (auto facet = delaunay.facets_begin(); facet != delaunay.facets_end(); ++facet) {
-        if (!delaunay.is_infinite(*facet)) {
 
             std::array<size_t, 3> face{};
             size_t face_vertex_idx = 0;
@@ -122,7 +125,7 @@ void write_faces_to_vector(
                 }
                 faces.push_back(face);
             }
-        }
+
     }
 }
 
@@ -174,14 +177,14 @@ void generate_torus(int count, double radius, double rot_radius, std::vector<Del
 }
 
 //circumcircle calculating without cross-product
-void triangle_circumcircle(Eigen::Vector3d &i, Eigen::Vector3d &j, Eigen::Vector3d &l, Eigen::VectorXd &center, double &radius) {
-    const Eigen::Vector3d a = i - l;
-    const Eigen::Vector3d b = j - l;
+void triangle_circumcircle(Eigen::VectorXd &i, Eigen::VectorXd &j, Eigen::VectorXd &l, Eigen::VectorXd &center, double &radius) {
+    const Eigen::VectorXd a = i - l;
+    const Eigen::VectorXd b = j - l;
 
     const double cos_theta = (a.dot(b)) / (a.norm() * b.norm());
     radius = ((i - j).norm()) / (2 * sin(acos(cos_theta)));
 
-    const Eigen::Vector3d helper_term = (pow(a.norm(), 2) * b - pow(b.norm(), 2) * a);
+    const Eigen::VectorXd helper_term = (pow(a.norm(), 2) * b - pow(b.norm(), 2) * a);
     center = ((helper_term.dot(b) * a - helper_term.dot(a) * b) / (2 * (pow(a.norm(), 2) * pow(b.norm(), 2) - pow(a.dot(b), 2)))) + l;
 }
 
@@ -207,9 +210,70 @@ void simplex_circumsphere(Delaunay::Full_cell_handle simplex, double &radius, Ei
 
     for (auto vertex = simplex->vertices_begin(); vertex != simplex->vertices_end(); vertex++) {
         double eps = 1e-10;
-        Eigen::Vector3d vi((*vertex)->point()[0], (*vertex)->point()[1], (*vertex)->point()[2]);
+        Eigen::VectorXd vi(dimension);
+        vi << (*vertex)->point()[0], (*vertex)->point()[1], (*vertex)->point()[2];
         assert(std::abs((vi - center).norm() - radius ) < eps);
     }
+}
+
+bool intersect_triangle_segement(
+    Voronoi_vertex &segement_start,
+    Voronoi_vertex &segement_end,
+    Eigen::VectorXd &triangle_v0,
+    Eigen::VectorXd &triangle_v1,
+    Eigen::VectorXd &triangle_v2,
+    Eigen::VectorXd &intersection
+    ) {
+    bool start_infinite = segement_start.is_infinite;
+    bool end_infinite = segement_end.is_infinite;
+
+    Eigen::VectorXd origin, direction;
+
+    if (start_infinite && end_infinite) {
+        return false;
+    }
+
+    if (!start_infinite && !end_infinite) {
+        origin = segement_start.point;
+        direction = segement_end.point - segement_start.point;
+    } else if (!start_infinite && end_infinite) {
+        origin = segement_start.point;
+
+    }
+
+    int dimension = triangle_v0.size();
+    Eigen::VectorXd segment_direction = segement_end.point - segement_start.point;
+    Eigen::VectorXd edge1 = triangle_v1 - triangle_v0;
+    Eigen::VectorXd edge2 = triangle_v2 - triangle_v0;
+
+    Eigen::MatrixXd A(dimension, 3);
+    A.col(0) = segment_direction;
+    A.col(1) = -edge1;
+    A.col(2) = -edge2;
+
+    Eigen::VectorXd b = triangle_v0 - segement_start.point;
+
+    Eigen::VectorXd tuv = A.colPivHouseholderQr().solve(b);
+    double t, u, v;
+    t = tuv(0);
+    u = tuv(1);
+    v = tuv(2);
+
+    double residual = (A * tuv - b).norm();
+    if (residual > 10e-8) {
+        return false;
+    }
+
+    if (t < -10e-8 || t > 1.0 + 10e-8) {
+        return false;
+    }
+
+    if (u < -10e-8 || v < -10e-8 || (u + v) > 1.0 + 10e-8) {
+        return false;
+    }
+
+    intersection = segement_start.point + t * segment_direction;
+    return true;
 }
 
 bool intersect_ray_segment(

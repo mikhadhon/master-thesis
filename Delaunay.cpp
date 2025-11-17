@@ -115,12 +115,18 @@ void voronoi_facet_from_edge(Edge &edge, Voronoi_face &voronoi_face, Delaunay &d
             auto neighbor = cell->neighbor(i);
             if (both_incident.contains(neighbor)) {
                 double radius1, radius2;
-                Eigen::VectorXd voronoi_vertex1, voronoi_vertex2;
+                Eigen::VectorXd voronoi_vertex1(d), voronoi_vertex2(d);
 
-                simplex_circumsphere(cell, radius1, voronoi_vertex1);
-                simplex_circumsphere(neighbor, radius2, voronoi_vertex2);
+                bool v1_infinite = delaunay.is_infinite(cell);
+                bool v2_infinite = delaunay.is_infinite(neighbor);
+                if (!v1_infinite) {
+                    simplex_circumsphere(cell, radius1, voronoi_vertex1);
+                }
+                if (!v2_infinite) {
+                    simplex_circumsphere(neighbor, radius2, voronoi_vertex2);
+                }
 
-                voronoi_face.voronoi_edges.push_back(Voronoi_edge(voronoi_vertex1, voronoi_vertex2, cell, neighbor));
+                voronoi_face.voronoi_edges.push_back(Voronoi_edge(voronoi_vertex1, v1_infinite, voronoi_vertex2, v2_infinite, cell, neighbor));
             }
         }
     }
