@@ -49,8 +49,9 @@ struct Voronoi_edge {
     Delaunay::Full_cell_handle cell1;
     Delaunay::Full_cell_handle cell2;
 
+    Eigen::VectorXd voronoi_edge_direction;
 
-    Voronoi_edge(Eigen::VectorXd vertex1, bool v1_infinite, Eigen::VectorXd vertex2, bool v2_infinite, Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2) : vertex1(v1_infinite, vertex1), vertex2(v2_infinite, vertex2), cell1(cell1), cell2(cell2) {}
+    Voronoi_edge(Eigen::VectorXd vertex1, bool v1_infinite, Eigen::VectorXd vertex2, bool v2_infinite, Eigen::VectorXd voronoi_edge_direction, Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2) : vertex1(v1_infinite, vertex1), vertex2(v2_infinite, vertex2), voronoi_edge_direction(voronoi_edge_direction), cell1(cell1), cell2(cell2) {}
 };
 
 struct Voronoi_face {
@@ -74,6 +75,12 @@ void get_facet_vertices(
     const Delaunay::Facet_iterator &facet,
     std::vector<Delaunay::Vertex_handle> &facet_vertices
 );
+
+void get_shared_delaunay_facet(Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2, Delaunay &delaunay, std::array<Eigen::VectorXd, 3> &face_vertices);
+
+void get_facet_normal(std::array<Eigen::VectorXd, 3> &facet_points, Eigen::VectorXd &normal);
+
+void orient_voronoi_edge(std::array<Eigen::VectorXd, 3> shared_facet_points, Eigen::VectorXd finite_voronoi_vertex, Eigen::VectorXd &voronoi_edge_direction);
 
 void extract_edges(Delaunay &delaunay, std::map<Delaunay::Vertex_handle, size_t> vertex_to_index, std::vector<std::array<size_t, 2>> &edges);
 

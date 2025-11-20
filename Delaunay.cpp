@@ -108,7 +108,8 @@ void voronoi_facet_from_edge(Edge &edge, Voronoi_face &voronoi_face, Delaunay &d
             both_incident.insert(incident_cell);
         }
     }
-
+    // TODO:
+    //zirkulieren, starten mit cell, kante, richtung,
     int d = delaunay.maximal_dimension();
     for (auto cell : both_incident) {
         for (int i = 0; i <= d; ++i) {
@@ -126,8 +127,62 @@ void voronoi_facet_from_edge(Edge &edge, Voronoi_face &voronoi_face, Delaunay &d
                     simplex_circumsphere(neighbor, radius2, voronoi_vertex2);
                 }
 
-                voronoi_face.voronoi_edges.push_back(Voronoi_edge(voronoi_vertex1, v1_infinite, voronoi_vertex2, v2_infinite, cell, neighbor));
+                Eigen::VectorXd voronoi_edge_direction;
+                if (!v1_infinite && !v2_infinite) {
+                    voronoi_edge_direction = (voronoi_vertex2 - voronoi_vertex1).normalized();
+                }
+                else {
+                    std::array<Eigen::VectorXd, 3> shared_facet_points;
+
+                    get_shared_delaunay_facet(cell, neighbor, delaunay, shared_facet_points);
+                    get_facet_normal(shared_facet_points, voronoi_edge_direction);
+
+                    if (v1_infinite) {
+                        orient_voronoi_edge(shared_facet_points, voronoi_vertex2, voronoi_edge_direction);
+                    }
+                    else if (v2_infinite) {
+                        orient_voronoi_edge(shared_facet_points, voronoi_vertex1, voronoi_edge_direction);
+                    }
+                }
+
+                voronoi_face.voronoi_edges.push_back(Voronoi_edge(voronoi_vertex1, v1_infinite, voronoi_vertex2, v2_infinite, voronoi_edge_direction, cell, neighbor));
             }
+        }
+    }
+}
+
+void orient_voronoi_edge(std::array<Eigen::VectorXd, 3> shared_facet_points, Eigen::VectorXd finite_voronoi_vertex, Eigen::VectorXd &voronoi_edge_direction) {
+    Eigen::VectorXd facet_center_estimate = shared_facet_points[0] + shared_facet_points[1] + shared_facet_points[2];
+    facet_center_estimate /= 3;
+    Eigen::VectorXd to_facet = facet_center_estimate - finite_voronoi_vertex;
+    int a = voronoi_edge_direction.size();
+    int b = to_facet.size();
+    if (voronoi_edge_direction.dot(to_facet) < 0) {
+        voronoi_edge_direction = -voronoi_edge_direction;
+    }
+}
+
+void get_facet_normal(std::array<Eigen::VectorXd, 3> &facet_points, Eigen::VectorXd &normal) {
+    Eigen::VectorXd v1 = facet_points[1] - facet_points[0];
+    Eigen::VectorXd v2 = facet_points[2] - facet_points[0];
+
+    Eigen::MatrixXd A(3, 2);
+    A.col(0) = v1;
+    A.col(1) = v2;
+
+    Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeFullU);
+    normal = svd.matrixU().col(2);
+    normal = normal.normalized();
+}
+
+void get_shared_delaunay_facet(Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2, Delaunay &delaunay, std::array<Eigen::VectorXd, 3> &face_vertices) {
+    int count = 0;
+    for (int i = 0; i <= cell1->maximal_dimension(); ++i) {
+        auto current_vertex = cell1->vertex(i);
+        if (cell2->has_vertex(current_vertex)) {
+            Eigen::VectorXd vertex_point(delaunay.maximal_dimension());
+            vertex_point << current_vertex->point()[0], current_vertex->point()[1], current_vertex->point()[2];
+            face_vertices[count++] = vertex_point;
         }
     }
 }

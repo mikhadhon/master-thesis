@@ -68,10 +68,10 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                                 Eigen::VectorXd intersection;
                                 Eigen::VectorXd curr_edge_1 = make_point_eigen(current_edge.vertex1->point());
                                 Eigen::VectorXd curr_edge_2 = make_point_eigen(current_edge.vertex2->point());
-                                bool intersection_exists = intersect_triangle_segement(voronoi_edge.vertex1, voronoi_edge.vertex2, curr_edge_1, curr_edge_2, current.first, intersection);
+                                bool intersection_exists = intersect_voronoi_edge_triangle(voronoi_edge, curr_edge_1, curr_edge_2, current.first, intersection);
 
                                 if (intersection_exists) {
-                                    if ((intersection - current.first).norm() > 10e-8) {
+                                    if ((intersection - current.first).norm() > 10e-8 || (intersection - current.first).norm() < -10e-8) {
                                         s_prime = intersection;
                                         nextEdge = &voronoi_edge;
                                         break;
@@ -81,12 +81,23 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                             std::vector<std::array<double, 3>> vv;
                             std::vector<std::array<size_t, 2>> ve;
                             size_t step = 0;
-                            // for (auto voronoi_edge : voronoi_face.voronoi_edges) {
-                            //     vv.push_back({voronoi_edge.vertex1(0), voronoi_edge.vertex1(1), voronoi_edge.vertex1(2)});
-                            //     vv.push_back({voronoi_edge.vertex2(0), voronoi_edge.vertex2(1), voronoi_edge.vertex2(2)});
-                            //     ve.push_back({step, step + 1});
-                            //     step += 2;
-                            // }
+                            for (auto voronoi_edge : voronoi_face.voronoi_edges) {
+                                if (!voronoi_edge.vertex1.is_infinite && !voronoi_edge.vertex2.is_infinite) {
+                                    vv.push_back({voronoi_edge.vertex1.point(0), voronoi_edge.vertex1.point(1), voronoi_edge.vertex1.point(2)});
+                                    vv.push_back({voronoi_edge.vertex2.point(0), voronoi_edge.vertex2.point(1), voronoi_edge.vertex2.point(2)});
+                                }
+                                else {
+                                    Voronoi_vertex* infinite_vertex = voronoi_edge.vertex1.is_infinite ? &voronoi_edge.vertex1 : &voronoi_edge.vertex2;
+                                    Voronoi_vertex* finite_vertex = voronoi_edge.vertex1.is_infinite ? &voronoi_edge.vertex2 : &voronoi_edge.vertex1;
+                                    vv.push_back({finite_vertex->point(0), finite_vertex->point(1), finite_vertex->point(2)});
+                                    Eigen::VectorXd helper_vertex(3);
+                                    helper_vertex << infinite_vertex->point(0), infinite_vertex->point(1), infinite_vertex->point(2);
+                                    helper_vertex = helper_vertex + voronoi_edge.voronoi_edge_direction;
+                                    vv.push_back({helper_vertex(0), helper_vertex(1), helper_vertex(2)});
+                                }
+                                ve.push_back({step, step + 1});
+                                step += 2;
+                            }
                             Eigen::VectorXd curr_del_1 = make_point_eigen(facet_vertices[0]->point());
                             Eigen::VectorXd curr_del_2 = make_point_eigen(facet_vertices[1]->point());
                             Eigen::VectorXd curr_del_3 = make_point_eigen(facet_vertices[2]->point());
@@ -98,9 +109,9 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                             std::vector<std::array<double, 3>> current_driver = {{origin(0), origin(1), origin(2)}};
                             auto *psMesh = polyscope::registerSurfaceMesh("current delaunay triangle", current_delaunay_triangle, current_delaunay_triangle_face);
                             auto *pcCloud = polyscope::registerPointCloud("s", current_s);
-                            auto *pcCloud2 = polyscope::registerPointCloud("s'", current_s_prime);
-                            //auto *pcCloud3 = polyscope::registerPointCloud("driver", current_driver);
-                            auto *psCurve = polyscope::registerCurveNetwork("voronoi edges", vv, ve);
+                            // auto *pcCloud2 = polyscope::registerPointCloud("s'", current_s_prime);
+                            // //auto *pcCloud3 = polyscope::registerPointCloud("driver", current_driver);
+                            // auto *psCurve = polyscope::registerCurveNetwork("voronoi edges", vv, ve);
                             polyscope::show();
 
                             if (nextEdge != nullptr) {
@@ -156,9 +167,9 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
             }
         }
 
-        // vertices.resize(vertex_count);
-        // for (auto fc_vertex : fc_vertex_to_index) {
-        //     vertices[fc_vertex.second] = fc_vertex.first;
-        // }
+        vertices.resize(vertex_count);
+        for (auto fc_vertex : fc_vertex_to_index) {
+            vertices[fc_vertex.second] = fc_vertex.first;
+        }
 
 }

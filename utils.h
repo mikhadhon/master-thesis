@@ -33,14 +33,12 @@ void triangle_circumcircle(Eigen::VectorXd &i, Eigen::VectorXd &j, Eigen::Vector
 
 void simplex_circumsphere(Delaunay::Full_cell_handle simplex, double &radius, Eigen::VectorXd &center);
 
-bool intersect_triangle_segement(
-    Voronoi_vertex &segement_start,
-    Voronoi_vertex &segement_end,
+bool intersect_voronoi_edge_triangle(
+    Voronoi_edge &voronoi_edge,
     Eigen::VectorXd &triangle_v0,
     Eigen::VectorXd &triangle_v1,
-    Eigen::VectorXd &triangle_v2,
-    Eigen::VectorXd &intersection
-    );
+    Eigen::VectorXd &triangle_v2, Eigen::VectorXd &intersection
+);
 
 bool intersect_ray_segment(
     Eigen::VectorXd &ray_origin,

@@ -2,6 +2,8 @@
 
 #include "utils.h"
 #include "Delaunay.h"
+#include "polyscope/point_cloud.h"
+#include "polyscope/surface_mesh.h"
 #include "polyscope/render/engine.h"
 
 Point make_point(Eigen::Vector3d &eigen_point) {
@@ -216,16 +218,14 @@ void simplex_circumsphere(Delaunay::Full_cell_handle simplex, double &radius, Ei
     }
 }
 
-bool intersect_triangle_segement(
-    Voronoi_vertex &segement_start,
-    Voronoi_vertex &segement_end,
+bool intersect_voronoi_edge_triangle(
+    Voronoi_edge &voronoi_edge,
     Eigen::VectorXd &triangle_v0,
     Eigen::VectorXd &triangle_v1,
-    Eigen::VectorXd &triangle_v2,
-    Eigen::VectorXd &intersection
-    ) {
-    bool start_infinite = segement_start.is_infinite;
-    bool end_infinite = segement_end.is_infinite;
+    Eigen::VectorXd &triangle_v2, Eigen::VectorXd &intersection
+) {
+    bool start_infinite = voronoi_edge.vertex1.is_infinite;
+    bool end_infinite = voronoi_edge.vertex2.is_infinite;
 
     Eigen::VectorXd origin, direction;
 
@@ -234,24 +234,27 @@ bool intersect_triangle_segement(
     }
 
     if (!start_infinite && !end_infinite) {
-        origin = segement_start.point;
-        direction = segement_end.point - segement_start.point;
+        origin = voronoi_edge.vertex1.point;
+        direction = voronoi_edge.vertex2.point - voronoi_edge.vertex1.point;
     } else if (!start_infinite && end_infinite) {
-        origin = segement_start.point;
-
+        origin = voronoi_edge.vertex1.point;
+        direction = voronoi_edge.voronoi_edge_direction;
+    }
+    else {
+        origin = voronoi_edge.vertex2.point;
+        direction = voronoi_edge.voronoi_edge_direction;
     }
 
     int dimension = triangle_v0.size();
-    Eigen::VectorXd segment_direction = segement_end.point - segement_start.point;
     Eigen::VectorXd edge1 = triangle_v1 - triangle_v0;
     Eigen::VectorXd edge2 = triangle_v2 - triangle_v0;
 
     Eigen::MatrixXd A(dimension, 3);
-    A.col(0) = segment_direction;
+    A.col(0) = direction;
     A.col(1) = -edge1;
     A.col(2) = -edge2;
 
-    Eigen::VectorXd b = triangle_v0 - segement_start.point;
+    Eigen::VectorXd b = triangle_v0 - origin;
 
     Eigen::VectorXd tuv = A.colPivHouseholderQr().solve(b);
     double t, u, v;
@@ -264,7 +267,7 @@ bool intersect_triangle_segement(
         return false;
     }
 
-    if (t < -10e-8 || t > 1.0 + 10e-8) {
+    if (t < -10e-8) {
         return false;
     }
 
@@ -272,7 +275,21 @@ bool intersect_triangle_segement(
         return false;
     }
 
-    intersection = segement_start.point + t * segment_direction;
+    intersection = origin + t * direction;
+
+    std::vector<Eigen::VectorXd> triangle = {triangle_v0, triangle_v1, triangle_v2};
+    std::vector<std::array<size_t, 3>> face = {{0, 1, 2}};
+    Eigen::VectorXd s(3);
+    double temp_radius;
+    triangle_circumcircle(triangle_v0, triangle_v1, triangle_v2, s, temp_radius);
+    std::vector<Eigen::VectorXd> s_points = {s};
+    std::vector<Eigen::VectorXd> s_primes = {intersection};
+    // auto *psMesh = polyscope::registerSurfaceMesh("current delaunay triangle", triangle, face);
+    // auto *pcCloud2 = polyscope::registerPointCloud("s'", s_primes);
+    // auto *pcCloud3 = polyscope::registerPointCloud("s", s_points);
+    //
+    // polyscope::show();
+
     return true;
 }
 
