@@ -13,6 +13,8 @@ Point make_point(Eigen::Vector3d &eigen_point);
 
 Eigen::VectorXd make_point_eigen(Point point);
 
+std::vector<Delaunay::Point> get_points_from_handles(const std::vector<Delaunay::Vertex_handle> &handles);
+
 void map_vertices_to_vector(
     Delaunay &delaunay,
     std::vector<std::array<double, 3> > &vertices,
@@ -28,31 +30,5 @@ void write_faces_to_vector(
 void generate_circle(int nsamples, int normal_windings, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3> &N1, Eigen::Matrix<double, Eigen::Dynamic, 3>  &N2, Eigen::Matrix<double, Eigen::Dynamic, 3> &T);
 
 void generate_torus(int count, double radius, double rot_radius, std::vector<Delaunay::Point> &torus_samples);
-
-void triangle_circumcircle(Eigen::VectorXd &i, Eigen::VectorXd &j, Eigen::VectorXd &l, Eigen::VectorXd &center, double &radius);
-
-void simplex_circumsphere(Delaunay::Full_cell_handle simplex, double &radius, Eigen::VectorXd &center);
-
-bool intersect_voronoi_edge_triangle(
-    Voronoi_edge &voronoi_edge,
-    Eigen::VectorXd &triangle_v0,
-    Eigen::VectorXd &triangle_v1,
-    Eigen::VectorXd &triangle_v2, Eigen::VectorXd &intersection
-);
-
-bool intersect_ray_segment(
-    Eigen::VectorXd &ray_origin,
-    Eigen::VectorXd &ray_pass_through,
-    Eigen::VectorXd &segment_start,
-    Eigen::VectorXd &segment_end,
-    Eigen::VectorXd &intersection
-    );
-
-bool is_inside_triangle(
-    const Eigen::VectorXd& p,
-    const Eigen::VectorXd& a,
-    const Eigen::VectorXd& b,
-    const Eigen::VectorXd& c
-);
 
 #endif

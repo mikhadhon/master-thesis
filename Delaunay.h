@@ -10,12 +10,17 @@ typedef K::Point_d Point;
 typedef K::FT FT;
 
 typedef CGAL::Delaunay_triangulation<K> Delaunay;
+typedef Delaunay::Geom_traits::Midpoint_d midpoint;
+typedef Delaunay::Geom_traits::Construct_circumcenter_d circumcenter;
+typedef Delaunay::Geom_traits::Squared_distance_d squared_distance;
 
 struct Edge {
     Delaunay::Vertex_handle vertex1;
     Delaunay::Vertex_handle vertex2;
 
-    Edge(Delaunay::Vertex_handle vertex1, Delaunay::Vertex_handle vertex2) : vertex1(vertex1), vertex2(vertex2) {}
+    Delaunay::Vertex_handle co_vertex;
+
+    Edge(Delaunay::Vertex_handle vertex1, Delaunay::Vertex_handle vertex2, Delaunay::Vertex_handle co_vertex) : vertex1(vertex1), vertex2(vertex2), co_vertex(co_vertex) {}
 
     bool operator==(const Edge & other) const {
         return (vertex1 == other.vertex1 && vertex2 == other.vertex2) ||
@@ -49,26 +54,31 @@ struct Voronoi_edge {
     Delaunay::Full_cell_handle cell1;
     Delaunay::Full_cell_handle cell2;
 
-    Eigen::VectorXd voronoi_edge_direction;
-
-    Voronoi_edge(Eigen::VectorXd vertex1, bool v1_infinite, Eigen::VectorXd vertex2, bool v2_infinite, Eigen::VectorXd voronoi_edge_direction, Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2) : vertex1(v1_infinite, vertex1), vertex2(v2_infinite, vertex2), voronoi_edge_direction(voronoi_edge_direction), cell1(cell1), cell2(cell2) {}
+    Voronoi_edge(Voronoi_vertex vertex1, Voronoi_vertex vertex2, Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2) : vertex1(vertex1), vertex2(vertex2), cell1(cell1), cell2(cell2) {}
 };
 
 struct Voronoi_face {
+    std::vector<Voronoi_vertex> voronoi_vertices;
     std::vector<Voronoi_edge> voronoi_edges;
+    std::vector<Eigen::VectorXd> ps_vertices;
+    std::vector<std::array<size_t, 2>> ps_edges;
 };
+
+Voronoi_face delaunay_edge_dual(Edge &edge, Delaunay::Facet_iterator &df, Delaunay &dt);
+
+Voronoi_edge delaunay_face_dual(Delaunay::Facet_iterator &face, Delaunay &dt);
+
+Delaunay::Face voronoi_edge_dual(Voronoi_edge &voronoi_edge);
+
+void simplex_circumsphere(Delaunay::Full_cell_handle simplex, Eigen::VectorXd &center);
 
 void insert_points(std::vector<Point> &points, Delaunay &delaunay);
 
-bool is_index_two_critical_point(const std::vector<Delaunay::Vertex_handle> &facet_vertices);
+bool is_index_two_critical_point(Delaunay::Facet_iterator &face, Delaunay &dt);
 
 bool is_gabriel(Edge &edge);
 
 void get_incident_cells_to_vertices(Edge &edge, std::vector<Delaunay::Full_cell_handle> &cell_neighbors);
-
-void voronoi_facet_from_edge(Edge &edge, Voronoi_face &voronoi_face, Delaunay &delaunay);
-
-void get_voronoi_facet_vertices(const Edge& edge, const Delaunay& delaunay, std::vector<Eigen::VectorXd>& facet_vertices);
 
 void get_facet_vertices(
     const Delaunay &delaunay,
@@ -76,18 +86,13 @@ void get_facet_vertices(
     std::vector<Delaunay::Vertex_handle> &facet_vertices
 );
 
-void get_shared_delaunay_facet(Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2, Delaunay &delaunay, std::array<Eigen::VectorXd, 3> &face_vertices);
+void get_facet_normal(std::vector<Eigen::VectorXd> &facet_points, Eigen::VectorXd &normal);
 
-void get_facet_normal(std::array<Eigen::VectorXd, 3> &facet_points, Eigen::VectorXd &normal);
-
-void orient_voronoi_edge(std::array<Eigen::VectorXd, 3> shared_facet_points, Eigen::VectorXd finite_voronoi_vertex, Eigen::VectorXd &voronoi_edge_direction);
+void orient_voronoi_edge(std::vector<Eigen::VectorXd> shared_facet_points, Eigen::VectorXd finite_voronoi_vertex, Eigen::VectorXd &voronoi_edge_direction);
 
 void extract_edges(Delaunay &delaunay, std::map<Delaunay::Vertex_handle, size_t> vertex_to_index, std::vector<std::array<size_t, 2>> &edges);
 
 void calculate_driver(const Eigen::VectorXd &voronoi_vertex, const Edge &delaunay_edge, Eigen::VectorXd &driver);
 
-bool is_intersection_in_facet(
-    const Eigen::VectorXd& intersection_point,
-    const std::vector<Eigen::VectorXd>& facet_vertices);
 
 #endif
