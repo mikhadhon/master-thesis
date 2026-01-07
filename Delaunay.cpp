@@ -3,19 +3,23 @@
 #include "Delaunay.h"
 
 #include "utils.h"
+#include "polyscope/point_cloud.h"
 
 typedef CGAL::Linear_algebraCd<FT> Linear_algebra;
 typedef Linear_algebra::Matrix Matrix;
 typedef Linear_algebra::Vector Vector;
 typedef Linear_algebra::RT RT;
 
-Voronoi_face delaunay_edge_dual(Edge &edge, Delaunay::Facet_iterator &df, Delaunay &dt) {
-    std::vector<Delaunay::Vertex_handle> face_vertices;
-    get_facet_vertices(dt, df, face_vertices);
-
+Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt) {
     std::vector<Delaunay::Full_cell_handle> incident_cells;
-    incident_cells.push_back(df->full_cell());
-    incident_cells.push_back(incident_cells[0]->neighbor(dt.index_of_covertex(*df)));
+    std::vector<Delaunay::Vertex_handle> current_face_vertices;
+
+    incident_cells.push_back(df.face.full_cell());
+    incident_cells.push_back(df.face.full_cell()->neighbor(df.index_of_covertex));
+
+    current_face_vertices.push_back(df.face.vertex(0));
+    current_face_vertices.push_back(df.face.vertex(1));
+    current_face_vertices.push_back(df.face.vertex(2));
 
     Delaunay::Full_cell_handle start_cell;
     Delaunay::Full_cell_handle current_cell;
@@ -34,7 +38,7 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Delaunay::Facet_iterator &df, Delaun
 
     Delaunay::Vertex_handle co_vertex_current_next;
     for (auto vertex = start_cell->vertices_begin(); vertex != start_cell->vertices_end(); ++vertex) {
-        if (*vertex != face_vertices[0] && *vertex != face_vertices[1] && *vertex != face_vertices[2]) {
+        if (*vertex != current_face_vertices[0] && *vertex != current_face_vertices[1] && *vertex != current_face_vertices[2]) {
             co_vertex_current_next = *vertex;
         }
     }
@@ -54,7 +58,7 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Delaunay::Facet_iterator &df, Delaun
         ps_vertices.push_back(voronoi_vertex.point);
     }
     else {
-        std::vector<Eigen::VectorXd> facet_points = {make_point_eigen(face_vertices[0]->point()), make_point_eigen(face_vertices[1]->point()), make_point_eigen(face_vertices[2]->point())};
+        std::vector<Eigen::VectorXd> facet_points = {make_point_eigen(current_face_vertices[0]->point()), make_point_eigen(current_face_vertices[1]->point()), make_point_eigen(current_face_vertices[2]->point())};
         Eigen::VectorXd normal;
         get_facet_normal(facet_points, normal);
         simplex_circumsphere(next_cell, voronoi_vertex_start);
@@ -83,10 +87,10 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Delaunay::Facet_iterator &df, Delaun
         ps_edges.push_back({voronoi_vertices.size() - 2, voronoi_vertices.size() - 1});
 
         for (int i = 0; i < 3; ++i) {
-            if (face_vertices[i] != edge.vertex1 && face_vertices[i] != edge.vertex2) {
+            if (current_face_vertices[i] != edge.vertex1 && current_face_vertices[i] != edge.vertex2) {
                 Delaunay::Vertex_handle temp = current_cell->mirror_vertex(current_cell->index(co_vertex_current_next), dt.maximal_dimension());
-                co_vertex_current_next = face_vertices[i];
-                face_vertices[i] = temp;
+                co_vertex_current_next = current_face_vertices[i];
+                current_face_vertices[i] = temp;
                 current_cell = next_cell;
                 next_cell = next_cell->neighbor(next_cell->index(co_vertex_current_next));
                 break;
@@ -99,7 +103,7 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Delaunay::Facet_iterator &df, Delaun
             Voronoi_edge(
                 voronoi_vertices[voronoi_vertices.size() - 1],
                 voronoi_vertices[0],
-                next_cell,
+                current_cell,
                 start_cell
             )
         );
@@ -134,10 +138,10 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Delaunay::Facet_iterator &df, Delaun
     return Voronoi_face(voronoi_vertices, voronoi_edges, ps_vertices, ps_edges);
 }
 
-Voronoi_edge delaunay_face_dual(Delaunay::Facet_iterator &face, Delaunay &dt) {
+Voronoi_edge delaunay_face_dual(Face &face, Delaunay &dt) {
     Delaunay::Full_cell_handle incident_cell0, incident_cell1;
-    incident_cell0 = face->full_cell();
-    incident_cell1 = incident_cell0->neighbor(face->index_of_covertex());
+    incident_cell0 = face.face.full_cell();
+    incident_cell1 = face.face.full_cell()->neighbor(face.index_of_covertex);
 
     bool infinite0 = dt.is_infinite(incident_cell0);
     bool infinite1 = dt.is_infinite(incident_cell1);
@@ -149,13 +153,11 @@ Voronoi_edge delaunay_face_dual(Delaunay::Facet_iterator &face, Delaunay &dt) {
         return Voronoi_edge(Voronoi_vertex(infinite0, voronoi_vertex0), Voronoi_vertex(infinite1, voronoi_vertex1), incident_cell0, incident_cell1);
     }
     else {
-        std::vector<Delaunay::Vertex_handle> face_vertex_handles;
-        get_facet_vertices(dt, face, face_vertex_handles);
         std::vector<Eigen::VectorXd> final_facet_vertices;
 
-        final_facet_vertices.push_back(make_point_eigen(face_vertex_handles[0]->point()));
-        final_facet_vertices.push_back(make_point_eigen(face_vertex_handles[1]->point()));
-        final_facet_vertices.push_back(make_point_eigen(face_vertex_handles[2]->point()));
+        final_facet_vertices.push_back(make_point_eigen(face.face.vertex(0)->point()));
+        final_facet_vertices.push_back(make_point_eigen(face.face.vertex(1)->point()));
+        final_facet_vertices.push_back(make_point_eigen(face.face.vertex(2)->point()));
 
         Delaunay::Full_cell_handle finite_cell = infinite0 ? incident_cell1 : incident_cell0;
         Delaunay::Full_cell_handle infinite_cell = infinite0 ? incident_cell0 : incident_cell1;
@@ -172,15 +174,20 @@ Voronoi_edge delaunay_face_dual(Delaunay::Facet_iterator &face, Delaunay &dt) {
     }
 }
 
-Delaunay::Face voronoi_edge_dual(Voronoi_edge &voronoi_edge) {
-    Delaunay::Face face(voronoi_edge.cell1);
+Face voronoi_edge_dual(Voronoi_edge &voronoi_edge) {
+    Delaunay::Face face_no_covertex(voronoi_edge.cell1);
+    int index_of_covertex;
     int vertex_count = 0;
 
     for (auto vertex = voronoi_edge.cell1->vertices_begin(); vertex != voronoi_edge.cell1->vertices_end(); ++vertex) {
         int vertex_index_in_cell1 = voronoi_edge.cell1->index(*vertex);
-        if (voronoi_edge.cell1->neighbor(vertex_index_in_cell1) == voronoi_edge.cell2) continue;
-        face.set_index(vertex_count, vertex_index_in_cell1);
+        if (voronoi_edge.cell1->neighbor(vertex_index_in_cell1) == voronoi_edge.cell2) index_of_covertex = vertex_index_in_cell1;
+        else {
+            face_no_covertex.set_index(vertex_count++, vertex_index_in_cell1);
+        }
     }
+
+    Face face(face_no_covertex, index_of_covertex);
     return face;
 }
 
@@ -210,22 +217,20 @@ void insert_points(std::vector<Point> &points, Delaunay &delaunay) {
     }
 }
 
-bool is_index_two_critical_point(Delaunay::Facet_iterator &face, Delaunay &dt) {
+bool is_index_two_critical_point(Face &face, Delaunay &dt) {
     Voronoi_edge face_dual = delaunay_face_dual(face, dt);
 
-    std::vector<Delaunay::Vertex_handle> face_vertex_handles;
     Eigen::VectorXd face_normal;
-    get_facet_vertices(dt, face, face_vertex_handles);
 
-    std::vector<Eigen::VectorXd> face_vertices = {make_point_eigen(face_vertex_handles[0]->point()), make_point_eigen(face_vertex_handles[1]->point()), make_point_eigen(face_vertex_handles[2]->point())};
+    std::vector<Eigen::VectorXd> face_vertices = {make_point_eigen(face.face.vertex(0)->point()), make_point_eigen(face.face.vertex(1)->point()), make_point_eigen(face.face.vertex(2)->point())};
     get_facet_normal(face_vertices, face_normal);
 
     double vertex0_direction = face_normal.dot(face_dual.vertex1.point - face_vertices[0]);
     double vertex1_direction = face_normal.dot(face_dual.vertex2.point - face_vertices[1]);
 
-    Eigen::VectorXd i = make_point_eigen(face_vertex_handles[0]->point());
-    Eigen::VectorXd j = make_point_eigen(face_vertex_handles[1]->point());
-    Eigen::VectorXd l = make_point_eigen(face_vertex_handles[2]->point());
+    Eigen::VectorXd i = make_point_eigen(face.face.vertex(0)->point());
+    Eigen::VectorXd j = make_point_eigen(face.face.vertex(1)->point());
+    Eigen::VectorXd l = make_point_eigen(face.face.vertex(2)->point());
 
     return (vertex0_direction * vertex1_direction < 0) && (j-i).dot(l-i) > 0 && (i-j).dot(l-j) > 0 && (i-l).dot(j-l) > 0;
 }

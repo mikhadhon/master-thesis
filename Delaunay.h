@@ -13,6 +13,7 @@ typedef CGAL::Delaunay_triangulation<K> Delaunay;
 typedef Delaunay::Geom_traits::Midpoint_d midpoint;
 typedef Delaunay::Geom_traits::Construct_circumcenter_d circumcenter;
 typedef Delaunay::Geom_traits::Squared_distance_d squared_distance;
+typedef Delaunay::Geom_traits::Contained_in_simplex_d contained_in_simplex;
 
 struct Edge {
     Delaunay::Vertex_handle vertex1;
@@ -32,6 +33,13 @@ struct Edge {
         std::pair<Delaunay::Vertex_handle, Delaunay::Vertex_handle> other_canonical = (other.vertex1 < other.vertex2) ? std::make_pair(other.vertex1, other.vertex2) : std::make_pair(other.vertex2, other.vertex1);
         return this_canonical < other_canonical;
     }
+};
+
+struct Face {
+    Delaunay::Face face;
+    int index_of_covertex;
+
+    Face(Delaunay::Face face, int index_of_covertex) : face(face), index_of_covertex(index_of_covertex) {}
 };
 
 inline bool lexicographic_less_vector(const Eigen::VectorXd &a, const Eigen::VectorXd &b) {
@@ -54,6 +62,11 @@ struct Voronoi_edge {
     Delaunay::Full_cell_handle cell1;
     Delaunay::Full_cell_handle cell2;
 
+    bool operator==(const Voronoi_edge & other) const {
+        return (cell1 == other.cell1 && cell2 == other.cell2) ||
+            (cell1 == other.cell2 && cell2 == other.cell1);
+    }
+
     Voronoi_edge(Voronoi_vertex vertex1, Voronoi_vertex vertex2, Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2) : vertex1(vertex1), vertex2(vertex2), cell1(cell1), cell2(cell2) {}
 };
 
@@ -64,17 +77,17 @@ struct Voronoi_face {
     std::vector<std::array<size_t, 2>> ps_edges;
 };
 
-Voronoi_face delaunay_edge_dual(Edge &edge, Delaunay::Facet_iterator &df, Delaunay &dt);
+Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt);
 
-Voronoi_edge delaunay_face_dual(Delaunay::Facet_iterator &face, Delaunay &dt);
+Voronoi_edge delaunay_face_dual(Face &face, Delaunay &dt);
 
-Delaunay::Face voronoi_edge_dual(Voronoi_edge &voronoi_edge);
+Face voronoi_edge_dual(Voronoi_edge &voronoi_edge);
 
 void simplex_circumsphere(Delaunay::Full_cell_handle simplex, Eigen::VectorXd &center);
 
 void insert_points(std::vector<Point> &points, Delaunay &delaunay);
 
-bool is_index_two_critical_point(Delaunay::Facet_iterator &face, Delaunay &dt);
+bool is_index_two_critical_point(Face &face, Delaunay &dt);
 
 bool is_gabriel(Edge &edge);
 

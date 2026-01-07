@@ -31,4 +31,6 @@ void generate_circle(int nsamples, int normal_windings, Eigen::Matrix<double, Ei
 
 void generate_torus(int count, double radius, double rot_radius, std::vector<Delaunay::Point> &torus_samples);
 
+bool is_point_in_triangle(const Point& p0, const Point& p1, const Point& p2, const Point& query);
+
 #endif

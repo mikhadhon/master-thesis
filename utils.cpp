@@ -35,7 +35,7 @@ void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &p
 
     std::uniform_real_distribution<> angle_t{ 0, 2 * M_PI }, angle_p{ 0, 2 * M_PI };
     std::uniform_real_distribution<> v_dist{-1.0, 1.0};
-    std::uniform_real_distribution<> noise{ -0.000001, 0.000001 };
+    std::uniform_real_distribution<> noise{ -0.001, 0.001 };
     Eigen::MatrixXd sphere_samples(count, 3);
 
     for (int i = 0; i < count; i++) {
@@ -185,4 +185,28 @@ void generate_torus(int count, double radius, double rot_radius, std::vector<Del
 
         torus_samples.push_back(Delaunay::Point(x, y, z));
     }
+}
+
+bool is_point_in_triangle(const Point& p0, const Point& p1, const Point& p2, const Point& query) {
+    Eigen::Vector3d v0(p0[0], p0[1], p0[2]);
+    Eigen::Vector3d v1(p1[0], p1[1], p1[2]);
+    Eigen::Vector3d v2(p2[0], p2[1], p2[2]);
+    Eigen::Vector3d p(query[0], query[1], query[2]);
+
+    Eigen::Vector3d v0v1 = v1 - v0;
+    Eigen::Vector3d v0v2 = v2 - v0;
+    Eigen::Vector3d v0p = p - v0;
+
+    double dot00 = v0v1.dot(v0v1);
+    double dot01 = v0v1.dot(v0v2);
+    double dot02 = v0v1.dot(v0p);
+    double dot11 = v0v2.dot(v0v2);
+    double dot12 = v0v2.dot(v0p);
+
+    double invDenom = 1.0 / (dot00 * dot11 - dot01 * dot01);
+    double u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+    double v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+
+    const double eps = 1e-10;
+    return (u >= -eps) && (v >= -eps) && (u + v <= 1.0 + eps);
 }
