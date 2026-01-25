@@ -8,6 +8,23 @@
 #include "polyscope/curve_network.h"
 #include "polyscope/point_cloud.h"
 
+void load_obj_points(const std::string& filename, std::vector<Delaunay::Point>& points) {
+    std::ifstream file(filename);
+    if (!file.is_open()) {
+        std::cerr << "Error: Could not open file " << filename << std::endl;
+        return;
+    }
+    std::string line;
+    while (std::getline(file, line)) {
+        if (line.substr(0, 2) == "v ") {
+            std::istringstream s(line.substr(2));
+            double x, y, z;
+            s >> x >> y >> z;
+            points.emplace_back(x, y, z);
+        }
+    }
+    file.close();
+}
 
 int main() {
     double samples[][3] = {
@@ -29,8 +46,9 @@ int main() {
     std::vector<Delaunay::Point> points;
     //gen_rectangle(10, points);
     // generate_torus(1000, 0.5, 1, points);
-    gen_sphere_sample(5000, 1, points);
+    gen_sphere_sample(1000, 1, points);
 
+    // load_obj_points("bunny.obj", points);
 
     // for (int i = 0; i < V.rows(); i++) {
     //     Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));
