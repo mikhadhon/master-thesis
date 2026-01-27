@@ -53,6 +53,10 @@ inline bool lexicographic_less_vector(const Eigen::VectorXd &a, const Eigen::Vec
 struct Voronoi_vertex {
     bool is_infinite;
     Eigen::VectorXd point;
+
+    bool operator==(const Voronoi_vertex & other) const {
+        return (is_infinite == other.is_infinite && point == other.point);
+    }
 };
 
 struct Voronoi_edge {
@@ -89,9 +93,9 @@ void insert_points(std::vector<Point> &points, Delaunay &delaunay);
 
 bool is_index_two_critical_point(Face &face, Delaunay &dt);
 
-bool is_gabriel(Edge &edge);
+bool is_gabriel(Edge &edge, Delaunay &dt);
 
-void get_incident_cells_to_vertices(Edge &edge, std::vector<Delaunay::Full_cell_handle> &cell_neighbors);
+void get_incident_cells_to_vertices(Edge &edge, Delaunay &dt, std::vector<Delaunay::Full_cell_handle> &cell_neighbors);
 
 void get_facet_vertices(
     const Delaunay &delaunay,

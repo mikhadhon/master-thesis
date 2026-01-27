@@ -46,9 +46,9 @@ int main() {
     std::vector<Delaunay::Point> points;
     //gen_rectangle(10, points);
     // generate_torus(1000, 0.5, 1, points);
-    gen_sphere_sample(1000, 1, points);
+    gen_sphere_sample(100, 1, points);
 
-    // load_obj_points("bunny.obj", points);
+    //load_obj_points("bunny.obj", points);
 
     // for (int i = 0; i < V.rows(); i++) {
     //     Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));
@@ -69,30 +69,21 @@ int main() {
     std::vector<std::array<double, 3> > vertices;
     std::vector<std::array<size_t, 3> > faces;
     std::vector<std::array<size_t, 3> > reconstructed_faces;
-    std::vector<std::array<size_t, 2> > edges;
     std::map<Delaunay::Vertex_handle, size_t> vertex_to_index;
 
     map_vertices_to_vector(delaunay3D, vertices, vertex_to_index);
     write_faces_to_vector(delaunay3D, faces, vertex_to_index);
-    extract_edges(delaunay3D, vertex_to_index, edges);
-    // auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
-    auto *pcCloud = polyscope::registerPointCloud("vertices", vertices);
+    auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
+    //auto *pcCloud = polyscope::registerPointCloud("delaunay vertices", vertices);
 
-    std::vector<Eigen::Vector3d> centers;
-    std::vector<Eigen::Vector3d> centers2;
-    flow_complex(delaunay3D, vertices, reconstructed_faces, vertex_to_index);
+    std::vector<std::array<double, 3> > reconstructed_vertices = vertices;
+    flow_complex(delaunay3D, reconstructed_vertices, reconstructed_faces, vertex_to_index);
 
-    std::cout << "Number of vertices: " << vertices.size() << std::endl;
+    std::cout << "Number of vertices: " << reconstructed_vertices.size() << std::endl;
     std::cout << "Number of faces: " << faces.size() << std::endl;
-    std::cout << "Number of edges: " << edges.size() << std::endl;
 
     if (!faces.empty()) {
-        auto *psRecMesh = polyscope::registerSurfaceMesh("rec mesh", vertices, reconstructed_faces);
-        // auto *pcCloud = polyscope::registerPointCloud("origins", centers);
-        // auto *pcCloud2 = polyscope::registerPointCloud("s", centers2);
-    }
-    if (!edges.empty()) {
-        auto *psCurve = polyscope::registerCurveNetwork("delaunay vertices", vertices, edges);
+        auto *psRecMesh = polyscope::registerSurfaceMesh("reconstructed mesh", reconstructed_vertices, reconstructed_faces);
     }
 
     polyscope::show();
