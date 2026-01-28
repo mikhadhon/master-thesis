@@ -258,13 +258,11 @@ bool is_index_two_critical_point(Face &face, Delaunay &dt) {
 }
 
 bool is_gabriel(Edge &edge, Delaunay &dt) {
-    std::vector<Delaunay::Point> triangle_points;
-    triangle_points.push_back(edge.vertex1->point());
-    triangle_points.push_back(edge.vertex2->point());
-    triangle_points.push_back(edge.co_vertex->point());
+    Eigen::VectorXd p1 = make_point_eigen(edge.vertex1->point());
+    Eigen::VectorXd p2 = make_point_eigen(edge.vertex2->point());
 
-    Delaunay::Point circumcenter_point = circumcenter()(triangle_points.begin(), triangle_points.end());
-    double sq_radius = squared_distance()(circumcenter_point, triangle_points[0]);
+    Eigen::VectorXd edge_midpoint = (p1 + p2) / 2.0;
+    double sq_radius = (p1 - edge_midpoint).squaredNorm();
 
     std::vector<Delaunay::Full_cell_handle> cell_neighbors;
     get_incident_cells_to_vertices(edge, dt, cell_neighbors);
@@ -278,9 +276,10 @@ bool is_gabriel(Edge &edge, Delaunay &dt) {
 
     const double eps = 1e-8;
     for (auto v : neighboring_vertices) {
-        if (v == edge.vertex1 || v == edge.vertex2 || v == edge.co_vertex) continue;
+        if (v == edge.vertex1 || v == edge.vertex2) continue;
+        if (dt.is_infinite(v)) continue;
 
-        double sq_dist = squared_distance()(v->point(), circumcenter_point);
+        double sq_dist = (make_point_eigen(v->point()) - edge_midpoint).squaredNorm();
         if (sq_dist < sq_radius - eps) {
             return false;
         }

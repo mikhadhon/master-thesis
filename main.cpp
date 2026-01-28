@@ -46,9 +46,9 @@ int main() {
     std::vector<Delaunay::Point> points;
     //gen_rectangle(10, points);
     // generate_torus(1000, 0.5, 1, points);
-    // gen_sphere_sample(1000, 1, points);
+    gen_sphere_sample(1000, 1, points);
 
-    load_obj_points("bunny.obj", points);
+    // load_obj_points("bunny.obj", points);
 
     // for (int i = 0; i < V.rows(); i++) {
     //     Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));

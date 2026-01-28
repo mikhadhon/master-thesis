@@ -131,7 +131,7 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                                     std::vector ps_current_edge = {current_edge.vertex1->point(), current_edge.vertex2->point()};
                                     std::vector<std::array<size_t, 2>> ps_current_edge_face = {{0, 1}};
                                     std::vector ps_driver = {driver};
-                                    if (true) {
+                                    if (false) {
                                         Delaunay::Full_cell_handle current_face_full_cell = current_delaunay_face.face.full_cell();
                                         std::vector<Point> cell_vertices;
                                         for (auto vertex = current_face_full_cell->vertices_begin(); vertex != current_face_full_cell->vertices_end(); ++vertex) {
@@ -241,5 +241,5 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
     for (auto fc_vertex : fc_vertex_to_index) {
         vertices[fc_vertex.second] = fc_vertex.first;
     }
-    //polyscope::registerSurfaceMesh("non-gabriel", vertices, non_gabriel_faces);
+    polyscope::registerSurfaceMesh("non-gabriel", vertices, non_gabriel_faces);
 }
