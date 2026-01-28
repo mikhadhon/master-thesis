@@ -127,7 +127,7 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                                     //s_prime = Point(temp(0), temp(1), temp(2));
                                     s_prime_candidates.push_back(std::make_pair(v_edge, Point(temp(0), temp(1), temp(2))));
 
-                                    std::vector ooo = {s_prime};
+                                    std::vector ooo = {temp};
                                     std::vector ps_current_edge = {current_edge.vertex1->point(), current_edge.vertex2->point()};
                                     std::vector<std::array<size_t, 2>> ps_current_edge_face = {{0, 1}};
                                     std::vector ps_driver = {driver};
@@ -145,7 +145,9 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                                         };
                                         std::vector<std::array<size_t, 3>> triangle_face = {{0, 1, 2}};
                                         polyscope::registerSurfaceMesh("current Delaunay triangle", triangle, triangle_face);
-
+                                        std::vector<Eigen::VectorXd> cell_circumcenter;
+                                        cell_circumcenter.push_back(simplex_circumsphere(current_face_full_cell));
+                                        polyscope::registerPointCloud("cell circumcenter", cell_circumcenter);
                                         polyscope::registerCurveNetwork("current Voronoi face", voronoi_face.ps_vertices, voronoi_face.ps_edges);
                                         polyscope::registerCurveNetwork("current Delaunay edge", ps_current_edge, ps_current_edge_face);
                                         polyscope::registerPointCloud("s prime", ooo);
@@ -159,7 +161,7 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
                                 }
                             }
                         }
-                        double distance_to_driver = MAXFLOAT;
+                        double distance_to_driver = FLT_MAX;
                         std::optional<Voronoi_edge> f_prime;
                         for (auto candidate : s_prime_candidates) {
                             if (squared_distance()(driver, candidate.second) < distance_to_driver) {
@@ -234,10 +236,10 @@ void flow_complex(Delaunay &delaunay, std::vector<std::array<double, 3> > &verti
         }
     }
     auto indexTwoPoints = polyscope::registerPointCloud("index two points", index_two_points);
-    polyscope::registerSurfaceMesh("delaunay readout", vertices, delaunay_faces);
+    //polyscope::registerSurfaceMesh("delaunay readout", vertices, delaunay_faces);
     vertices.resize(vertex_count);
     for (auto fc_vertex : fc_vertex_to_index) {
         vertices[fc_vertex.second] = fc_vertex.first;
     }
-    polyscope::registerSurfaceMesh("non-gabriel", vertices, non_gabriel_faces);
+    //polyscope::registerSurfaceMesh("non-gabriel", vertices, non_gabriel_faces);
 }

@@ -87,7 +87,7 @@ Voronoi_edge delaunay_face_dual(Face &face, Delaunay &dt);
 
 Face voronoi_edge_dual(Voronoi_edge &voronoi_edge);
 
-void simplex_circumsphere(Delaunay::Full_cell_handle simplex, Eigen::VectorXd &center);
+Eigen::VectorXd simplex_circumsphere(Delaunay::Full_cell_handle simplex);
 
 void insert_points(std::vector<Point> &points, Delaunay &delaunay);
 

@@ -12,168 +12,6 @@ typedef Linear_algebra::Matrix Matrix;
 typedef Linear_algebra::Vector Vector;
 typedef Linear_algebra::RT RT;
 
-// Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt) {
-//     std::vector<Delaunay::Full_cell_handle> incident_cells;
-//     std::vector<Delaunay::Vertex_handle> current_face_vertices;
-//
-//     incident_cells.push_back(df.face.full_cell());
-//     incident_cells.push_back(df.face.full_cell()->neighbor(df.index_of_covertex));
-//
-//     current_face_vertices.push_back(df.face.vertex(0));
-//     current_face_vertices.push_back(df.face.vertex(1));
-//     current_face_vertices.push_back(df.face.vertex(2));
-//
-//     Delaunay::Full_cell_handle start_cell;
-//     Delaunay::Full_cell_handle current_cell;
-//     Delaunay::Full_cell_handle next_cell;
-//
-//     if (dt.is_infinite(incident_cells[0]) && dt.is_infinite(incident_cells[1])) {
-//         Eigen::VectorXd voronoi_vertex_start(dt.maximal_dimension());
-//         Eigen::VectorXd voronoi_vertex_end(dt.maximal_dimension());
-//         std::vector<Eigen::VectorXd> facet_points = {make_point_eigen(current_face_vertices[0]->point()), make_point_eigen(current_face_vertices[1]->point()), make_point_eigen(current_face_vertices[2]->point())};
-//         Eigen::VectorXd normal;
-//         get_facet_normal(facet_points, normal);
-//         simplex_circumsphere(df.face.full_cell(), voronoi_vertex_start);
-//         orient_voronoi_edge(facet_points, voronoi_vertex_start, normal);
-//         voronoi_vertex_start = voronoi_vertex_start + 2*normal;
-//         voronoi_vertex_end = voronoi_vertex_start - 4*normal;
-//         Voronoi_vertex voronoi_vertex1(true, voronoi_vertex_start);
-//         Voronoi_vertex voronoi_vertex2(true, voronoi_vertex_end);
-//         std::vector<Voronoi_vertex> voronoi_vertices = {voronoi_vertex1, voronoi_vertex2};
-//         std::vector<Eigen::VectorXd> ps_vertices = {voronoi_vertex1.point, voronoi_vertex2.point};
-//         std::vector<std::array<size_t, 2>> ps_edges = {{0, 1}};
-//         std::vector<Voronoi_edge> edges = {{Voronoi_edge(voronoi_vertex1, voronoi_vertex2, df.face.full_cell(), df.face.full_cell())}};
-//         return Voronoi_face(voronoi_vertices, edges, ps_vertices, ps_edges);
-//     }
-//     else if (dt.is_infinite(incident_cells[0])) {
-//         start_cell = incident_cells[0];
-//         current_cell = incident_cells[0];
-//         next_cell = incident_cells[1];
-//     }
-//     else {
-//         start_cell = incident_cells[1];
-//         current_cell = incident_cells[1];
-//         next_cell = incident_cells[0];
-//     }
-//
-//     Delaunay::Vertex_handle co_vertex_current_next;
-//     for (auto vertex = start_cell->vertices_begin(); vertex != start_cell->vertices_end(); ++vertex) {
-//         if (*vertex != current_face_vertices[0] && *vertex != current_face_vertices[1] && *vertex != current_face_vertices[2]) {
-//             co_vertex_current_next = *vertex;
-//         }
-//     }
-//
-//     bool test = dt.is_infinite(co_vertex_current_next);
-//
-//     std::vector<Voronoi_vertex> voronoi_vertices;
-//     std::vector<Voronoi_edge> voronoi_edges;
-//     std::vector<Eigen::VectorXd> ps_vertices;
-//     std::vector<std::array<size_t, 2>> ps_edges;
-//     Eigen::VectorXd voronoi_vertex_start(dt.maximal_dimension());
-//
-//     if (!dt.is_infinite(co_vertex_current_next)) {
-//         simplex_circumsphere(start_cell, voronoi_vertex_start);
-//         Voronoi_vertex voronoi_vertex(false, voronoi_vertex_start);
-//         voronoi_vertices.push_back(voronoi_vertex);
-//         ps_vertices.push_back(voronoi_vertex.point);
-//     }
-//     else {
-//         std::vector<Eigen::VectorXd> facet_points = {make_point_eigen(current_face_vertices[0]->point()), make_point_eigen(current_face_vertices[1]->point()), make_point_eigen(current_face_vertices[2]->point())};
-//         Eigen::VectorXd normal;
-//         get_facet_normal(facet_points, normal);
-//         simplex_circumsphere(next_cell, voronoi_vertex_start);
-//         orient_voronoi_edge(facet_points, voronoi_vertex_start, normal);
-//         voronoi_vertex_start = voronoi_vertex_start + 2*normal;
-//         Voronoi_vertex voronoi_vertex(true, voronoi_vertex_start);
-//         voronoi_vertices.push_back(voronoi_vertex);
-//         ps_vertices.push_back(voronoi_vertex.point);
-//     }
-//
-//     while (next_cell != start_cell && !dt.is_infinite(next_cell)) {
-//         Eigen::VectorXd voronoi_vertex_next(3);
-//
-//         simplex_circumsphere(next_cell, voronoi_vertex_next);
-//         Voronoi_vertex voronoi_vertex(false, voronoi_vertex_next);
-//         voronoi_vertices.push_back(voronoi_vertex);
-//         ps_vertices.push_back(voronoi_vertex.point);
-//         voronoi_edges.push_back(
-//             Voronoi_edge(
-//                 voronoi_vertices[voronoi_vertices.size() - 2],
-//                 voronoi_vertices[voronoi_vertices.size() - 1],
-//                 current_cell,
-//                 next_cell
-//             )
-//         );
-//         ps_edges.push_back({voronoi_vertices.size() - 2, voronoi_vertices.size() - 1});
-//
-//         for (int i = 0; i < 3; ++i) {
-//             if (current_face_vertices[i] != edge.vertex1 && current_face_vertices[i] != edge.vertex2) {
-//                 Delaunay::Vertex_handle temp = current_cell->mirror_vertex(current_cell->index(co_vertex_current_next), dt.maximal_dimension());
-//                 co_vertex_current_next = current_face_vertices[i];
-//                 current_face_vertices[i] = temp;
-//                 current_cell = next_cell;
-//                 next_cell = next_cell->neighbor(next_cell->index(co_vertex_current_next));
-//                 break;
-//             }
-//         }
-//     }
-//
-//     if (!dt.is_infinite(next_cell)) {
-//         voronoi_edges.push_back(
-//             Voronoi_edge(
-//                 voronoi_vertices[voronoi_vertices.size() - 1],
-//                 voronoi_vertices[0],
-//                 current_cell,
-//                 start_cell
-//             )
-//         );
-//         ps_edges.push_back({voronoi_vertices.size() - 1, 0});
-//     }
-//     else {
-//         Eigen::VectorXd voronoi_vertex_next(3);
-//
-//         simplex_circumsphere(current_cell, voronoi_vertex_next);
-//         std::vector<Eigen::VectorXd> final_facet_vertices;
-//         for (auto vertex = current_cell->vertices_begin(); vertex != current_cell->vertices_end(); ++vertex) {
-//             if (*vertex != co_vertex_current_next) {
-//                 final_facet_vertices.push_back(make_point_eigen((*vertex)->point()));
-//             }
-//         }
-//         Eigen::VectorXd normal;
-//         get_facet_normal(final_facet_vertices, normal);
-//         orient_voronoi_edge(final_facet_vertices, voronoi_vertex_next, normal);
-//         Voronoi_vertex voronoi_vertex(true, voronoi_vertex_next + 2*normal);
-//         voronoi_vertices.push_back(voronoi_vertex);
-//         ps_vertices.push_back(voronoi_vertex.point);
-//         voronoi_edges.push_back(
-//             Voronoi_edge(
-//                 voronoi_vertices[voronoi_vertices.size() - 2],
-//                 voronoi_vertices[voronoi_vertices.size() - 1],
-//                 current_cell,
-//                 current_cell->neighbor(current_cell->index(co_vertex_current_next))
-//             )
-//         );
-//         ps_edges.push_back({voronoi_vertices.size() - 2, voronoi_vertices.size() - 1});
-//     }
-//     std::vector<Eigen::VectorXd> triangle = {make_point_eigen(current_face_vertices[0]->point()), make_point_eigen(current_face_vertices[1]->point()), make_point_eigen(current_face_vertices[2]->point())};
-//     std::vector<std::array<size_t, 3>> triangle_face = {{0, 1, 2}};
-//     //polyscope::registerSurfaceMesh("current Delaunay face", triangle, triangle_face);
-//     std::vector<Eigen::VectorXd> voronoi_points;
-//     for (auto & vertex : voronoi_vertices) {
-//         voronoi_points.push_back(vertex.point);
-//     }
-//     std::vector<std::array<size_t, 2>> voronoi_edges_indices;
-//     for (auto & edge : voronoi_edges) {
-//         size_t index_first = std::find(voronoi_vertices.begin(), voronoi_vertices.end(), edge.vertex1) - voronoi_vertices.begin();
-//         size_t index_second = std::find(voronoi_vertices.begin(), voronoi_vertices.end(), edge.vertex2) - voronoi_vertices.begin();
-//         voronoi_edges_indices.push_back({index_first, index_second});
-//     }
-//     voronoi_edges_indices.push_back({voronoi_edges.size() - 1, 0});
-//     //polyscope::registerCurveNetwork("current Voronoi face", voronoi_points, voronoi_edges_indices);
-//     // polyscope::show();
-//     return Voronoi_face(voronoi_vertices, voronoi_edges, ps_vertices, ps_edges);
-// }
-
 Delaunay::Full_cell_handle get_next_tetrahedron(Delaunay::Full_cell_handle &current_tet, Edge &edge, Delaunay::Vertex_handle current_opposite, Delaunay &dt) {
     for (int i = 0; i <= dt.maximal_dimension(); ++i) {
         auto neighbor = current_tet->neighbor(i);
@@ -188,34 +26,14 @@ Delaunay::Full_cell_handle get_next_tetrahedron(Delaunay::Full_cell_handle &curr
     return Delaunay::Full_cell_handle();
 }
 
-Eigen::VectorXd calculate_infinite_voronoi_vertex_3d(
-    Delaunay::Full_cell_handle finite_tetrahedron,
-    const std::vector<Eigen::VectorXd> &shared_triangle_vertices,
-    const Delaunay &dt) {
-
-    // Berechne Circumcenter des finiten Tetraeders
-    Eigen::VectorXd circumcenter;
-    simplex_circumsphere(finite_tetrahedron, circumcenter);
-
-    // Berechne Normale des gemeinsamen Dreiecks
-    Eigen::VectorXd normal;
-    get_facet_normal(const_cast<std::vector<Eigen::VectorXd>&>(shared_triangle_vertices), normal);
-
-    // Berechne Schwerpunkt des Dreiecks
-    Eigen::VectorXd triangle_center = Eigen::VectorXd::Zero(3);
-    for (const auto &vertex : shared_triangle_vertices) {
-        triangle_center += vertex;
+void get_shared_delaunay_facet(Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2, Delaunay &delaunay, std::vector<Point> &face_vertices) {
+    int count = 0;
+    for (int i = 0; i <= cell1->maximal_dimension(); ++i) {
+        auto current_vertex = cell1->vertex(i);
+        if (cell2->has_vertex(current_vertex)) {
+            face_vertices.push_back(current_vertex->point());
+        }
     }
-    triangle_center /= shared_triangle_vertices.size();
-
-    // Orientiere Normale weg vom Circumcenter
-    Eigen::VectorXd to_triangle = triangle_center - circumcenter;
-    if (normal.dot(to_triangle) < 0) {
-        normal = -normal;
-    }
-
-    // Berechne infinite vertex mit großer aber finiter Distanz
-    return circumcenter + 2 * normal;
 }
 
 Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt) {
@@ -268,49 +86,49 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt) {
     std::vector<std::array<size_t, 2>> ps_edges;
     std::vector<Eigen::VectorXd> infinite_vertices;
 
-    std::vector<Eigen::VectorXd> edge_triangle_vertices = {
-        make_point_eigen(edge.vertex1->point()),
-        make_point_eigen(edge.vertex2->point()),
-        make_point_eigen(edge.co_vertex->point())
-    };
-
     for (size_t i = 0; i < ordered_incident_cells.size(); ++i) {
         Voronoi_vertex v_vertex;
 
         if (!is_infinite_tet[i]) {
-            Eigen::VectorXd circumcenter;
-            simplex_circumsphere(ordered_incident_cells[i], circumcenter);
+            Eigen::VectorXd circumcenter = simplex_circumsphere(ordered_incident_cells[i]);
             v_vertex = Voronoi_vertex{false, circumcenter};
         } else {
-            Delaunay::Full_cell_handle finite_neighbor = nullptr;
+            Delaunay::Full_cell_handle finite_neighbor = is_infinite_tet[(i + 1) % is_infinite_tet.size()] ? ordered_incident_cells[(i - 1) % is_infinite_tet.size()] : ordered_incident_cells[(i + 1) % is_infinite_tet.size()];
+            Eigen::VectorXd finite_circumcenter = simplex_circumsphere(finite_neighbor);
 
-            for (size_t j = 0; j < ordered_incident_cells.size(); ++j) {
-                if (j != i && !is_infinite_tet[j]) {
-                    bool shares_facet = false;
-                    for (int k = 0; k <= dt.maximal_dimension(); ++k) {
-                        if (ordered_incident_cells[i]->neighbor(k) == ordered_incident_cells[j]) {
-                            finite_neighbor = ordered_incident_cells[j];
-                            shares_facet = true;
-                            break;
-                        }
-                    }
-                    if (shares_facet) break;
+            std::vector<Point> shared_facet_points;
+            get_shared_delaunay_facet(ordered_incident_cells[i], finite_neighbor, dt, shared_facet_points);
+
+            std::vector<Eigen::VectorXd> facet_points_eigen;
+            for (const auto& p : shared_facet_points) {
+                facet_points_eigen.push_back(make_point_eigen(p));
+            }
+
+            Eigen::VectorXd normal;
+            get_facet_normal(facet_points_eigen, normal);
+
+            Eigen::VectorXd opposite_vertex;
+            for (auto v = finite_neighbor->vertices_begin(); v != finite_neighbor->vertices_end(); ++v) {
+                if (!dt.is_infinite(*v) && !ordered_incident_cells[i]->has_vertex(*v)) {
+                    opposite_vertex = make_point_eigen((*v)->point());
+                    break;
                 }
             }
 
-            if (finite_neighbor != nullptr) {
-                Eigen::VectorXd infinite_point = calculate_infinite_voronoi_vertex_3d(
-                    finite_neighbor, edge_triangle_vertices, dt);
-                v_vertex = Voronoi_vertex{true, infinite_point};
-                infinite_vertices.push_back(infinite_point);
+            Eigen::VectorXd to_opposite = opposite_vertex - facet_points_eigen[0];
+            if (normal.dot(to_opposite) > 0) {
+                normal = -normal;
             }
+
+            Eigen::VectorXd infinite_point = finite_circumcenter + 2 * normal;
+            v_vertex = Voronoi_vertex{true, infinite_point};
+            infinite_vertices.push_back(infinite_point);
         }
 
         voronoi_vertices.push_back(v_vertex);
         ps_vertices.push_back(v_vertex.point);
     }
 
-    // 4. Erstelle Voronoi-Edges zwischen aufeinanderfolgenden Vertices
     for (size_t i = 0; i < ordered_incident_cells.size(); ++i) {
         size_t next_i = (i + 1) % ordered_incident_cells.size();
 
@@ -324,6 +142,7 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt) {
             ps_edges.push_back({i, next_i});
         }
     }
+    polyscope::registerPointCloud("infinite voronoi vertices", infinite_vertices);
     return Voronoi_face{voronoi_vertices, voronoi_edges, ps_vertices, ps_edges};
 
 }
@@ -337,9 +156,10 @@ Voronoi_edge delaunay_face_dual(Face &face, Delaunay &dt) {
     bool infinite1 = dt.is_infinite(incident_cell1);
 
     Eigen::VectorXd voronoi_vertex0, voronoi_vertex1;
+
     if (!infinite0 && !infinite1) {
-        simplex_circumsphere(incident_cell0, voronoi_vertex0);
-        simplex_circumsphere(incident_cell1, voronoi_vertex1);
+        voronoi_vertex0 = simplex_circumsphere(incident_cell0);
+        voronoi_vertex1 = simplex_circumsphere(incident_cell1);
         return Voronoi_edge(Voronoi_vertex(infinite0, voronoi_vertex0), Voronoi_vertex(infinite1, voronoi_vertex1), incident_cell0, incident_cell1);
     }
     else {
@@ -354,11 +174,23 @@ Voronoi_edge delaunay_face_dual(Face &face, Delaunay &dt) {
 
         Eigen::VectorXd normal;
         get_facet_normal(final_facet_vertices, normal);
-        Eigen::VectorXd voronoi_vertex_next(3);
-        simplex_circumsphere(finite_cell, voronoi_vertex_next);
-        orient_voronoi_edge(final_facet_vertices, voronoi_vertex_next, normal);
-        Voronoi_vertex infinite_voronoi_vertex(true, voronoi_vertex_next + 2*normal);
-        Voronoi_vertex finite_voronoi_vertex(false, voronoi_vertex_next);
+        Eigen::VectorXd finite_circumcenter = simplex_circumsphere(finite_cell);
+
+        Eigen::VectorXd opposite_vertex;
+        for (auto v = finite_cell->vertices_begin(); v != finite_cell->vertices_end(); ++v) {
+            if (!dt.is_infinite(*v) && !infinite_cell->has_vertex(*v)) {
+                opposite_vertex = make_point_eigen((*v)->point());
+                break;
+            }
+        }
+
+        Eigen::VectorXd to_opposite = opposite_vertex - final_facet_vertices[0];
+        if (normal.dot(to_opposite) > 0) {
+            normal = -normal;
+        }
+
+        Voronoi_vertex infinite_voronoi_vertex(true, finite_circumcenter + 1000 * normal);
+        Voronoi_vertex finite_voronoi_vertex(false, finite_circumcenter);
 
         return Voronoi_edge(finite_voronoi_vertex, infinite_voronoi_vertex, finite_cell, infinite_cell);
     }
@@ -381,13 +213,13 @@ Face voronoi_edge_dual(Voronoi_edge &voronoi_edge) {
     return face;
 }
 
-void simplex_circumsphere(Delaunay::Full_cell_handle simplex, Eigen::VectorXd &center) {
+Eigen::VectorXd simplex_circumsphere(Delaunay::Full_cell_handle simplex) {
     std::vector<Point> simplex_points;
     for (auto point = simplex->vertices_begin(); point != simplex->vertices_end(); ++point) {
         simplex_points.push_back((*point)->point());
     }
     Point cgal_center = circumcenter()(simplex_points.begin(), simplex_points.end());
-    center = make_point_eigen(cgal_center);
+    return make_point_eigen(cgal_center);
 }
 
 void insert_points(std::vector<Point> &points, Delaunay &delaunay) {
@@ -518,18 +350,6 @@ void get_facet_normal(std::vector<Eigen::VectorXd> &facet_points, Eigen::VectorX
     normal = normal.normalized();
 }
 
-void get_shared_delaunay_facet(Delaunay::Full_cell_handle cell1, Delaunay::Full_cell_handle cell2, Delaunay &delaunay, std::array<Eigen::VectorXd, 3> &face_vertices) {
-    int count = 0;
-    for (int i = 0; i <= cell1->maximal_dimension(); ++i) {
-        auto current_vertex = cell1->vertex(i);
-        if (cell2->has_vertex(current_vertex)) {
-            Eigen::VectorXd vertex_point(delaunay.maximal_dimension());
-            vertex_point << current_vertex->point()[0], current_vertex->point()[1], current_vertex->point()[2];
-            face_vertices[count++] = vertex_point;
-        }
-    }
-}
-
 void get_voronoi_facet_vertices(const Edge& edge, const Delaunay& delaunay, std::vector<Eigen::VectorXd>& facet_vertices) {
     Delaunay::Vertex_handle vertex1 = edge.vertex1;
     Delaunay::Vertex_handle vertex2 = edge.vertex2;
@@ -546,8 +366,7 @@ void get_voronoi_facet_vertices(const Edge& edge, const Delaunay& delaunay, std:
     }
 
     for (auto cell : both_incident) {
-        Eigen::VectorXd center;
-        simplex_circumsphere(cell, center);
+        Eigen::VectorXd center = simplex_circumsphere(cell);
         facet_vertices.push_back(center);
     }
 }

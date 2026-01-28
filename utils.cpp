@@ -35,7 +35,7 @@ void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &p
 
     std::uniform_real_distribution<> angle_t{ 0, 2 * M_PI }, angle_p{ 0, 2 * M_PI };
     std::uniform_real_distribution<> v_dist{-1.0, 1.0};
-    std::uniform_real_distribution<> noise{ -0.001, 0.001 };
+    std::uniform_real_distribution<> noise{ 0, 0.01 };
     Eigen::MatrixXd sphere_samples(count, 3);
 
     for (int i = 0; i < count; i++) {
@@ -43,10 +43,11 @@ void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &p
         double q = v_dist(gen);
 
         double horizontal_radius = sqrt(1 - q * q);
+        double r = radius + noise(gen);
 
-        double x = radius * horizontal_radius * cos(p) + noise(gen);
-        double y = radius * horizontal_radius * sin(p) + noise(gen);
-        double z = radius * q + noise(gen);
+        double x = r * horizontal_radius * cos(p);
+        double y = r * horizontal_radius * sin(p);
+        double z = r * q;
 
         sphere_samples.row(i) = Eigen::Vector3d(x, y, z).transpose();
     }
