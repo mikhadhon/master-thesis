@@ -54,14 +54,6 @@ struct Face {
     Face(Delaunay::Face face, int index_of_covertex) : face(face), index_of_covertex(index_of_covertex) {}
 };
 
-inline bool lexicographic_less_vector(const Eigen::VectorXd &a, const Eigen::VectorXd &b) {
-    int dimension = a.size();
-    for (int i = 0; i < dimension; i++) {
-        if (a[i] < b[i]) { return true; }
-        if (a[i] > b[i]) { return false; }
-    }
-}
-
 struct Voronoi_vertex {
     bool is_infinite;
     Eigen::VectorXd point;

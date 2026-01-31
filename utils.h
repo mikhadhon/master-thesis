@@ -7,7 +7,7 @@
 
 std::string get_timestamp();
 
-void write_to_obj(Eigen::MatrixXd V, Eigen::MatrixXi F);
+void write_to_obj(Eigen::MatrixXd V, Eigen::MatrixXi F, std::string identifier);
 
 void read_ply(const std::string &file_path, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3> &F);
 
@@ -38,5 +38,9 @@ void generate_circle(int nsamples, int normal_windings, Eigen::Matrix<double, Ei
 void generate_torus(int count, double radius, double rot_radius, std::vector<Delaunay::Point> &torus_samples);
 
 bool is_point_in_triangle(const Point& p0, const Point& p1, const Point& p2, const Point& query);
+
+void generate_trefoil(int nsamples, int normal_windings, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3>  &N1, Eigen::Matrix<double, Eigen::Dynamic, 3> &N2, Eigen::Matrix<double, Eigen::Dynamic, 3> &T);
+
+bool intersect_segment_ray(std::pair<Eigen::VectorXd, Eigen::VectorXd> ray, std::pair<Eigen::VectorXd, Eigen::VectorXd> segment, Eigen::VectorXd &intersection);
 
 #endif

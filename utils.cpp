@@ -20,8 +20,8 @@ void read_ply(const std::string &file_path, Eigen::Matrix<double, Eigen::Dynamic
     igl::readPLY(file_path, V, F);
 }
 
-void write_to_obj(Eigen::MatrixXd V, Eigen::MatrixXi F) {
-    std::string filename = "../output/" + get_timestamp() + ".obj";
+void write_to_obj(Eigen::MatrixXd V, Eigen::MatrixXi F, std::string identifier) {
+    std::string filename = "../output/" + identifier + "_" + get_timestamp() + ".obj";
     if (igl::writeOBJ(filename, V, F)) {
         std::cout << "Curve network saved to: " << filename << std::endl;
     } else {
@@ -204,4 +204,78 @@ bool is_point_in_triangle(const Point& p0, const Point& p1, const Point& p2, con
 
     const double eps = 1e-10;
     return (u >= -eps) && (v >= -eps) && (u + v <= 1.0 + eps);
+}
+
+void generate_trefoil(int nsamples, int normal_windings, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3>  &N1, Eigen::Matrix<double, Eigen::Dynamic, 3> &N2, Eigen::Matrix<double, Eigen::Dynamic, 3> &T){
+    double r = 1.;
+
+    V.resize(nsamples, 3);
+    N1.resize(nsamples, 3);
+    N2.resize(nsamples, 3);
+    T.resize(nsamples, 3);
+
+    // double stretchz = 2.7;
+    double stretchz = 1.;
+
+    for (int i=0; i<nsamples; i++) {
+        double t = (1.*i) / nsamples;
+        double dtheta = (2.*M_PI);
+        double theta  = dtheta*t;
+
+        V.row(i)  = Eigen::Vector3d(    cos(theta) + 2*cos(2*theta),
+                                        sin(theta) - 2*sin(2*theta),
+                                       -sin(3*theta) * stretchz);
+        Eigen::Vector3d Tangent = Eigen::Vector3d( -sin(theta) - 4*sin(2*theta),
+                                                    cos(theta) - 4*cos(2*theta),
+                                                 -3*cos(3*theta) * stretchz ).normalized();
+        T.row(i)  = Tangent;
+        Eigen::Vector3d dTudt = Eigen::Vector3d(  -cos(theta) - 8*cos(2*theta),
+                                                  -sin(theta) + 8*sin(2*theta),
+                                                 9*sin(3*theta) * stretchz);
+        N1.row(i) = (dTudt - dTudt.dot(Tangent) * Tangent).normalized();
+
+        N2.row(i) = T.row(i).cross(N1.row(i));
+        N2.row(i).normalize();
+
+        if (normal_windings > 0) {
+            theta = (2.*M_PI/nsamples)*i * normal_windings;
+            Eigen::Matrix3d frame;
+            frame.row(0) = N1.row(i);
+            frame.row(1) = N2.row(i);
+            frame.row(2) =  T.row(i);
+            Eigen::Matrix3d Rz; Rz << cos(theta), -sin(theta), 0, sin(theta), cos(theta), 0, 0, 0, 1;
+            Eigen::Matrix3d R =  frame.transpose() * Rz * frame;
+
+            N1.row(i) = N1.row(i) * R.transpose();
+            N2.row(i) = N2.row(i) * R.transpose();
+        }
+    }
+
+    std::cout << "trefoil, min/max per dim: " << std::endl;;
+    std::cout << V.col(0).minCoeff() << "-" << V.col(0).maxCoeff() << std::endl;
+    std::cout << V.col(1).minCoeff() << "-" << V.col(1).maxCoeff() << std::endl;
+    std::cout << V.col(2).minCoeff() << "-" << V.col(2).maxCoeff() << std::endl;
+
+}
+
+bool intersect_segment_ray(std::pair<Eigen::VectorXd, Eigen::VectorXd> ray, std::pair<Eigen::VectorXd, Eigen::VectorXd> segment, Eigen::VectorXd &intersection) {
+    const Eigen::Vector3d segment_dir = segment.second - segment.first;
+
+    const Eigen::VectorXd ray_direction = (ray.second - ray.first).normalized();
+    const Eigen::VectorXd w0 = ray.first - segment.first;
+    const double a = ray_direction.dot(ray_direction);
+    const double b = ray_direction.dot(segment_dir);
+    const double c = segment_dir.dot(segment_dir);
+    const double d_coef = ray_direction.dot(w0);
+    const double e = segment_dir.dot(w0);
+
+    const double denom = a * c - b * b;
+
+    const double t_ray = (b * e - c * d_coef) / denom;
+
+    if (const double t_edge = (a * e - b * d_coef) / denom; t_ray >= 0.0 && t_edge >= 0.0 && t_edge <= 1.0) {
+        intersection = ray.first + t_ray * ray_direction;
+        return true;
+    }
+    return false;
 }

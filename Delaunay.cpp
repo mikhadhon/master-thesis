@@ -232,7 +232,6 @@ void insert_points(std::vector<Point> &points, Delaunay &delaunay) {
         else {
             hint = delaunay.insert(*it);
         }
-        printf("Processing: %d/%d\n", ++i, static_cast<int>(points.size()));
     }
     if (!delaunay.is_valid()) {
         std::cerr << "Triangulation is invalid!" << std::endl;
