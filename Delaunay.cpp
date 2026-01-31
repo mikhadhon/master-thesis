@@ -414,3 +414,23 @@ void calculate_driver(const Eigen::VectorXd &voronoi_vertex, const Edge &delauna
     double t = point_vec.dot(line_vec) / line_vec.squaredNorm();
     driver = p1 + t * line_vec;
 }
+
+void find_gabriel_edges(Delaunay &dt, std::vector<Edge> &gabriel_edges) {
+     std::unordered_set<Edge, EdgeHash> visited_edges;
+    int dim = dt.maximal_dimension();
+
+    for (auto cell = dt.finite_full_cells_begin(); cell != dt.finite_full_cells_end(); ++cell) {
+        for (int i = 0; i < dim; ++i) {
+            for (int j = i + 1; j <= dim; ++j) {
+                Delaunay::Vertex_handle v1 = cell->vertex(i);
+                Delaunay::Vertex_handle v2 = cell->vertex(j);
+
+                if (v2 < v1) std::swap(v1, v2);
+                Edge e(v1, v2, Delaunay::Vertex_handle());
+                if (visited_edges.insert(e).second && is_gabriel(e, dt)) {
+                    gabriel_edges.push_back(e);
+                }
+            }
+        }
+    }
+}

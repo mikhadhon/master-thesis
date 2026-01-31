@@ -3,6 +3,7 @@
 
 #include <CGAL/Epick_d.h>
 #include <CGAL/Delaunay_triangulation.h>
+#include <boost/functional/hash.hpp>
 
 typedef CGAL::Dimension_tag<3> Dimension;
 typedef CGAL::Epick_d<Dimension> K;
@@ -34,6 +35,17 @@ struct Edge {
         return this_canonical < other_canonical;
     }
 };
+
+struct EdgeHash {
+    std::size_t operator()(const Edge& e) const {
+        std::size_t seed = 0;
+        boost::hash_combine(seed, &*e.vertex1);
+        boost::hash_combine(seed, &*e.vertex2);
+        return seed;
+    }
+};
+
+void find_gabriel_edges(Delaunay& dt, std::vector<Edge>& gabriel_edges);
 
 struct Face {
     Delaunay::Face face;

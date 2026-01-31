@@ -3,6 +3,9 @@
   "version-string" : "1.0.0",
   "builtin-baseline" : "8ebda5cd30c3c88e62671b5f1a07889008c0863b",
   "dependencies" : [ {
+    "name" : "libigl",
+    "version>=": "2.6.0"
+  },{
     "name" : "boost-accumulators",
     "version>=" : "1.88.0"
   }, {

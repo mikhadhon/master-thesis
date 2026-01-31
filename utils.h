@@ -5,11 +5,17 @@
 
 #include "Delaunay.h"
 
+std::string get_timestamp();
+
+void write_to_obj(Eigen::MatrixXd V, Eigen::MatrixXi F);
+
+void read_ply(const std::string &file_path, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3> &F);
+
 void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &points);
 
 void gen_rectangle(int n, std::vector<Delaunay::Point> &points);
 
-Point make_point(Eigen::Vector3d &eigen_point);
+Point make_point(Eigen::VectorXd &eigen_point);
 
 Eigen::VectorXd make_point_eigen(Point point);
 
@@ -17,7 +23,7 @@ std::vector<Delaunay::Point> get_points_from_handles(const std::vector<Delaunay:
 
 void map_vertices_to_vector(
     Delaunay &delaunay,
-    std::vector<std::array<double, 3> > &vertices,
+    std::vector<Eigen::VectorXd> &vertices,
     std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index
 );
 

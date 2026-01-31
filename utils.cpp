@@ -5,10 +5,28 @@
 #include "polyscope/point_cloud.h"
 #include "polyscope/surface_mesh.h"
 #include "polyscope/render/engine.h"
+#include "igl/writeOBJ.h"
+#include "igl/readPLY.h"
 
-Point make_point(Eigen::Vector3d &eigen_point) {
-    double coords[3] = {eigen_point[0], eigen_point[1], eigen_point[2]};
-    return Point(3, coords, coords+3);
+std::string get_timestamp() {
+    auto now = std::chrono::system_clock::now();
+    auto in_time_t = std::chrono::system_clock::to_time_t(now);
+    std::stringstream ss;
+    ss << std::put_time(std::localtime(&in_time_t), "%Y%m%d_%H%M%S");
+    return ss.str();
+}
+
+void read_ply(const std::string &file_path, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3> &F) {
+    igl::readPLY(file_path, V, F);
+}
+
+void write_to_obj(Eigen::MatrixXd V, Eigen::MatrixXi F) {
+    std::string filename = "../output/" + get_timestamp() + ".obj";
+    if (igl::writeOBJ(filename, V, F)) {
+        std::cout << "Curve network saved to: " << filename << std::endl;
+    } else {
+        std::cerr << "Failed to save curve to: " << filename << std::endl;
+    }
 }
 
 Eigen::VectorXd make_point_eigen(Point point) {
@@ -105,15 +123,18 @@ void gen_rectangle(int n, std::vector<Delaunay::Point> &points) {
 
 void map_vertices_to_vector(
     Delaunay &delaunay,
-    std::vector<std::array<double, 3> > &vertices,
+    std::vector<Eigen::VectorXd> &vertices,
     std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index
 ) {
     size_t vertex_index = 0;
+    int dim = delaunay.maximal_dimension();
     for (auto vertex_it = delaunay.vertices_begin();
         vertex_it != delaunay.vertices_end(); ++vertex_it) {
         if (!delaunay.is_infinite(vertex_it)) {
             Delaunay::Point p = vertex_it->point();
-            vertices.push_back({p[0], p[1], p[2]});
+            Eigen::VectorXd v(dim);
+            v << p[0], p[1], p[2];
+            vertices.push_back(v);
             vertex_to_index[vertex_it] = vertex_index++;
         }
     }
@@ -138,33 +159,6 @@ void write_faces_to_vector(
                 faces.push_back(face);
             }
 
-    }
-}
-
-void generate_circle(int nsamples, int normal_windings, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3> &N1, Eigen::Matrix<double, Eigen::Dynamic, 3>  &N2, Eigen::Matrix<double, Eigen::Dynamic, 3> &T){
-    double r = 1.;
-    V.resize(nsamples, 3);
-    N1.resize(nsamples, 3);
-    N2.resize(nsamples, 3);
-    T.resize(nsamples, 3);
-    for (int i=0; i<nsamples; i++) {
-        double theta = (2.*M_PI/nsamples)*i;
-        V.row(i)  = Eigen::Vector3d(cos(theta), sin(theta), 1.);
-        N1.row(i) = Eigen::Vector3d(cos(theta), sin(theta), 0.).normalized();
-        N2.row(i) = Eigen::Vector3d(        0.,         0., 1.).normalized();
-        T.row(i)  = N1.row(i).cross(N2.row(i));
-        if (normal_windings > 0) {
-            theta = (2.*M_PI/nsamples)*i * normal_windings;
-            Eigen::Matrix3d frame;
-            frame.row(0) = N1.row(i);
-            frame.row(1) = N2.row(i);
-            frame.row(2) =  T.row(i);
-            Eigen::Matrix3d Rz; Rz << cos(theta), -sin(theta), 0, sin(theta), cos(theta), 0, 0, 0, 1;
-            Eigen::Matrix3d R =  frame.transpose() * Rz * frame;
-
-            N1.row(i) = N1.row(i) * R.transpose();
-            N2.row(i) = N2.row(i) * R.transpose();
-        }
     }
 }
 
