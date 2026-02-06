@@ -142,7 +142,7 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt) {
             ps_edges.push_back({i, next_i});
         }
     }
-    polyscope::registerPointCloud("infinite voronoi vertices", infinite_vertices);
+    //polyscope::registerPointCloud("infinite voronoi vertices", infinite_vertices);
     return Voronoi_face{voronoi_vertices, voronoi_edges, ps_vertices, ps_edges};
 
 }
@@ -232,6 +232,7 @@ void insert_points(std::vector<Point> &points, Delaunay &delaunay) {
         else {
             hint = delaunay.insert(*it);
         }
+        printf("Processing: %d/%d\n", ++i, static_cast<int>(points.size()));
     }
     if (!delaunay.is_valid()) {
         std::cerr << "Triangulation is invalid!" << std::endl;

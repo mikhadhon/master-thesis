@@ -8,6 +8,7 @@
 #include "data_gen.h"
 #include "polyscope/curve_network.h"
 #include "polyscope/point_cloud.h"
+#include "igl/random_points_on_mesh.h"
 
 void load_obj_points(const std::string& filename, std::vector<Delaunay::Point>& points) {
     std::ifstream file(filename);
@@ -28,14 +29,14 @@ void load_obj_points(const std::string& filename, std::vector<Delaunay::Point>& 
 }
 
 void load_xyz_points(const std::string& filename, std::vector<Delaunay::Point>& points) {
-    std::ifstream file("../" + filename);
+    std::ifstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file " << filename << std::endl;
         return;
     }
     std::string line;
     while (std::getline(file, line)) {
-        std::istringstream s(line.substr(2));
+        std::istringstream s(line);
         double x, y, z;
         s >> x >> y >> z;
         points.emplace_back(x, y, z);
@@ -44,33 +45,50 @@ void load_xyz_points(const std::string& filename, std::vector<Delaunay::Point>& 
 }
 
 int main() {
-    std::string testfile = "happyStandRight_";
+    std::string testfile = "happy_vrip_res";
     std::ofstream timestamps("../output/" + testfile + "_" + get_timestamp() + ".csv");
 
     timestamps << "Vertices,Duration\n";
 
-    for (int i = 0; i >= 0; i--) {
+    std::vector nvertices = {1000000};
+    // for (int i = 1; i >= 1; i--) {
+    for (auto n : nvertices) {
         Eigen::Matrix<double, Eigen::Dynamic, 3> V;
-        Eigen::Matrix<double, Eigen::Dynamic, 3> F;
+        Eigen::MatrixXi F;
         Eigen::Matrix<double, Eigen::Dynamic, 3> N1;
         Eigen::Matrix<double, Eigen::Dynamic, 3> N2;
         Eigen::Matrix<double, Eigen::Dynamic, 3> T;
 
-        //generate_trefoil(1000, 3, V, N1, N2, T);
-        std::string filename = testfile + std::to_string(i);
-        std::string filepath = "../" + filename + ".ply";
+        generate_trefoil(1000, 3, V, N1, N2, T);
+        std::string filename = testfile + std::to_string(n);
+        // std::string filepath = "../" + filename + ".ply";
+        //std::string filepath = "../output/happy_vrip_res1000000_1000000_20260204_213045.obj";
+        std::string filepath = "../happy_vrip_res4.ply";
         //read_ply(filepath, V, F);
+        //read_obj(filepath, V, F);
+        std::vector<Delaunay::Point> points;
+        //gen_sphere_sample(1000000, 1, points);
+
+
+        Eigen::MatrixXd B;
+        Eigen::MatrixXi FI;
+        Eigen::MatrixXd X;
+        //igl::random_points_on_mesh(n, V, F, B, FI, X);
+
+        std::cout << "randomized" << std::endl;
 
         Delaunay delaunay3D(3);
 
-        std::vector<Delaunay::Point> points;
         //gen_rectangle(10, points);
         //generate_torus(1000, 0.5, 1, points);
-        //gen_sphere_sample(1000, 1, points);
 
         //load_obj_points("stanford-bunny.obj", points);
-        load_xyz_points("bunny_raw.xyz", points);
+        //load_xyz_points("../bunny_raw.xyz", points);
 
+        // for (int i = 0; i < X.rows(); i++) {
+        //     Delaunay::Point p(X(i, 0), X(i, 1), X(i, 2));
+        //     points.push_back(p);
+        // }
         for (int i = 0; i < V.rows(); i++) {
             Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));
             points.push_back(p);
@@ -79,6 +97,7 @@ int main() {
         insert_points(points, delaunay3D);
 
         std::cout << "Triangulation dimension: " << delaunay3D.current_dimension() << std::endl;
+        std::cout << "Vertices: " << points.size() << std::endl;
 
         polyscope::init();
 
@@ -94,7 +113,8 @@ int main() {
 
         std::vector<Eigen::VectorXd> reconstructed_vertices = vertices;
         auto time_start = std::chrono::high_resolution_clock::now();
-        flow_complex(delaunay3D, reconstructed_vertices, reconstructed_faces, vertex_to_index);
+        std::vector<std::vector<std::array<size_t, 3>>> index_2_stable_manifolds;
+        flow_complex(delaunay3D, reconstructed_vertices, reconstructed_faces, vertex_to_index, index_2_stable_manifolds);
         auto time_end = std::chrono::high_resolution_clock::now();
 
         std::chrono::duration<double, std::milli> float_ms = time_end - time_start;
@@ -103,17 +123,21 @@ int main() {
         timestamps << points.size() << "," << float_ms.count() << std::endl;
 
         std::vector<Edge> gabriel_edges;
-        //find_gabriel_edges(delaunay3D, gabriel_edges);
+        find_gabriel_edges(delaunay3D, gabriel_edges);
 
         std::vector<std::array<size_t, 2>> ps_edges;
         for (auto edge: gabriel_edges) {
             ps_edges.push_back({vertex_to_index[edge.vertex1], vertex_to_index[edge.vertex2]});
         }
 
+        //create reduced flow complex
+        //find pairs of gabriel edge + index 2 stable manifolds where stable manifold has gabriel edge incident to 2 stable manifolds
+
+
         std::cout << "Number of vertices: " << reconstructed_vertices.size() << std::endl;
         std::cout << "Number of faces: " << faces.size() << std::endl;
 
-        if (!reconstructed_faces.empty()) {
+        if (!reconstructed_faces.empty() && false) {
             auto *psRecMesh = polyscope::registerSurfaceMesh("reconstructed mesh", reconstructed_vertices, reconstructed_faces);
 
             Eigen::MatrixXd V_out(reconstructed_vertices.size(), 3);

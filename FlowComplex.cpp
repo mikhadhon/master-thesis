@@ -1,18 +1,21 @@
 #include <queue>
 #include <polyscope/polyscope.h>
 #include <polyscope/surface_mesh.h>
+#include <polyscope/curve_network.h>
+#include <polyscope/point_cloud.h>
 
 #include "FlowComplex.h"
 #include "utils.h"
 
-void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, std::vector<std::array<size_t, 3>> &faces, std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index) {
+void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, std::vector<std::array<size_t, 3>> &faces, std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index, std::vector<std::vector<std::array<size_t, 3>>> &index_2_stable_manifolds) {
     std::map<std::array<double, 3>, size_t> fc_vertex_to_index;
     int vertex_count = static_cast<int>(vertices.size());
     std::vector<Point> s_primes;
-    std::vector<Point> index_two_points;
+    std::vector<Eigen::VectorXd> index_two_points;
     std::vector<std::array<size_t, 3>> delaunay_faces;
     std::vector<std::array<size_t, 3>> non_gabriel_faces;
     std::vector<std::array<size_t, 3>> index_two_triangles;
+    std::vector<std::array<size_t, 2>> index_one_edges;
 
     for (auto facet = delaunay.facets_begin(); facet != delaunay.facets_end(); ++facet) {
         if (!delaunay.is_infinite(*facet)) {
@@ -28,13 +31,14 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
             delaunay_faces.push_back({vertex_to_index[face.face.vertex(0)], vertex_to_index[face.face.vertex((1))], vertex_to_index[face.face.vertex((2))]});
 
             if (is_index_two_critical_point(face, delaunay)) {
+                std::vector<std::array<size_t, 3>> stable_manifold;
                 std::queue<std::tuple<Eigen::VectorXd, Edge, Face>> edge_queue;
 
                 std::vector<Point> cgal_points = {face.face.vertex(0)->point(), face.face.vertex(1)->point(), face.face.vertex(2)->point()};
                 Point cgal_center = circumcenter()(cgal_points.begin(), cgal_points.end());
 
                 Eigen::VectorXd center = make_point_eigen(cgal_center);
-                index_two_points.push_back(cgal_center);
+                index_two_points.push_back(center);
 
                 edge_queue.emplace(center, Edge(face.face.vertex(0), face.face.vertex(1), face.face.vertex(2)), face);
                 edge_queue.emplace(center, Edge(face.face.vertex(0), face.face.vertex(2), face.face.vertex(1)), face);
@@ -58,6 +62,8 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                         fc_face[1] = vertex_to_index[current_edge.vertex2];
                         fc_face[2] = fc_vertex_to_index[fc_center];
                         faces.push_back(fc_face);
+                        stable_manifold.push_back(fc_face);
+                        index_one_edges.push_back({vertex_to_index[current_edge.vertex1], vertex_to_index[current_edge.vertex2]});
                     }
                     else {
                         Voronoi_edge current_voronoi_edge = delaunay_face_dual(current_delaunay_face, delaunay);
@@ -108,12 +114,45 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                                 edge_queue.emplace(s_prime.value(), next_edge, next_face.value());
                             }
                         }
+                        if (!s_prime.has_value()) {
+                            // if (false) {
+                            //         std::vector<Eigen::VectorXd> vv;
+                            //         vv.push_back(current_voronoi_edge.vertex1.point);
+                            //         vv.push_back(current_voronoi_edge.vertex2.point);
+                            //         std::vector<std::array<size_t, 2>> ve = {{0, 1}};
+                            //         std::vector ps_current_edge = {current_edge.vertex1->point(), current_edge.vertex2->point()};
+                            //         std::vector<std::array<size_t, 2>> ps_current_edge_face = {{0, 1}};
+                            //         std::vector ps_driver = {driver};
+                            //         Delaunay::Full_cell_handle current_face_full_cell = current_delaunay_face.face.full_cell();
+                            //         std::vector<Point> cell_vertices;
+                            //         for (auto vertex = current_face_full_cell->vertices_begin(); vertex != current_face_full_cell->vertices_end(); ++vertex) {
+                            //             cell_vertices.push_back((*vertex)->point());
+                            //         }
+                            //         polyscope::registerCurveNetwork("ve", vv, ve);
+                            //         std::vector<Eigen::VectorXd> triangle = {
+                            //             make_point_eigen(current_edge.vertex1->point()),
+                            //             make_point_eigen(current_edge.vertex2->point()),
+                            //             make_point_eigen(current_edge.co_vertex->point())
+                            //         };
+                            //         std::vector<std::array<size_t, 3>> triangle_face = {{0, 1, 2}};
+                            //         polyscope::registerSurfaceMesh("current Delaunay triangle", triangle, triangle_face);
+                            //         std::vector<Eigen::VectorXd> cell_circumcenter;
+                            //         cell_circumcenter.push_back(simplex_circumsphere(current_face_full_cell));
+                            //         polyscope::registerPointCloud("cell circumcenter", cell_circumcenter);
+                            //         polyscope::registerCurveNetwork("current Voronoi face", voronoi_face.ps_vertices, voronoi_face.ps_edges);
+                            //         polyscope::registerCurveNetwork("current Delaunay edge", ps_current_edge, ps_current_edge_face);
+                            //         polyscope::registerPointCloud("driver", ps_driver);
+                            //         polyscope::registerPointCloud("cell", cell_vertices);
+                            //         polyscope::show();
+                            //     }
+                        }
                     }
                 }
+                index_2_stable_manifolds.push_back(stable_manifold);
             }
         }
     }
-    //auto indexTwoPoints = polyscope::registerPointCloud("index two points", index_two_points);
+    auto indexTwoPoints = polyscope::registerPointCloud("index two points", index_two_points);
     //polyscope::registerSurfaceMesh("delaunay readout", vertices, delaunay_faces);
     vertices.resize(vertex_count);
     for (auto fc_vertex : fc_vertex_to_index) {
@@ -121,5 +160,6 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
         new_vertex << fc_vertex.first[0], fc_vertex.first[1], fc_vertex.first[2];
         vertices[fc_vertex.second] = new_vertex;
     }
+    polyscope::registerCurveNetwork("index one edges", vertices, index_one_edges);
     //polyscope::registerSurfaceMesh("non-gabriel", vertices, non_gabriel_faces);
 }

@@ -1,12 +1,12 @@
 #ifndef DELAUNAY_H
 #define DELAUNAY_H
 
-#include <CGAL/Epick_d.h>
+#include <CGAL/Epeck_d.h>
 #include <CGAL/Delaunay_triangulation.h>
 #include <boost/functional/hash.hpp>
 
 typedef CGAL::Dimension_tag<3> Dimension;
-typedef CGAL::Epick_d<Dimension> K;
+typedef CGAL::Epeck_d<Dimension> K;
 typedef K::Point_d Point;
 typedef K::FT FT;
 

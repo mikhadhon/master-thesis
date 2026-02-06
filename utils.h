@@ -9,7 +9,9 @@ std::string get_timestamp();
 
 void write_to_obj(Eigen::MatrixXd V, Eigen::MatrixXi F, std::string identifier);
 
-void read_ply(const std::string &file_path, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3> &F);
+void read_ply(const std::string &file_path, Eigen::MatrixXd &V, Eigen::MatrixXi &F);
+
+void read_obj(const std::string &file_path, Eigen::MatrixXd &V, Eigen::MatrixXi &F);
 
 void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &points);
 

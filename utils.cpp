@@ -7,6 +7,7 @@
 #include "polyscope/render/engine.h"
 #include "igl/writeOBJ.h"
 #include "igl/readPLY.h"
+#include "igl/readOBJ.h"
 
 std::string get_timestamp() {
     auto now = std::chrono::system_clock::now();
@@ -16,8 +17,12 @@ std::string get_timestamp() {
     return ss.str();
 }
 
-void read_ply(const std::string &file_path, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3> &F) {
+void read_ply(const std::string &file_path, Eigen::MatrixXd &V, Eigen::MatrixXi &F) {
     igl::readPLY(file_path, V, F);
+}
+
+void read_obj(const std::string &file_path, Eigen::MatrixXd &V, Eigen::MatrixXi &F) {
+    igl::readOBJ(file_path, V, F);
 }
 
 void write_to_obj(Eigen::MatrixXd V, Eigen::MatrixXi F, std::string identifier) {
@@ -33,7 +38,7 @@ Eigen::VectorXd make_point_eigen(Point point) {
     int dimension = point.dimension();
     Eigen::VectorXd eigen_point(dimension);
     for (int i = 0; i < dimension; i++) {
-        eigen_point(i) = point[i];
+        eigen_point(i) = CGAL::to_double(point[i]);
     }
     return eigen_point;
 }
@@ -133,7 +138,7 @@ void map_vertices_to_vector(
         if (!delaunay.is_infinite(vertex_it)) {
             Delaunay::Point p = vertex_it->point();
             Eigen::VectorXd v(dim);
-            v << p[0], p[1], p[2];
+            v << CGAL::to_double(p[0]), CGAL::to_double(p[1]), CGAL::to_double(p[2]);
             vertices.push_back(v);
             vertex_to_index[vertex_it] = vertex_index++;
         }
@@ -182,29 +187,29 @@ void generate_torus(int count, double radius, double rot_radius, std::vector<Del
     }
 }
 
-bool is_point_in_triangle(const Point& p0, const Point& p1, const Point& p2, const Point& query) {
-    Eigen::Vector3d v0(p0[0], p0[1], p0[2]);
-    Eigen::Vector3d v1(p1[0], p1[1], p1[2]);
-    Eigen::Vector3d v2(p2[0], p2[1], p2[2]);
-    Eigen::Vector3d p(query[0], query[1], query[2]);
-
-    Eigen::Vector3d v0v1 = v1 - v0;
-    Eigen::Vector3d v0v2 = v2 - v0;
-    Eigen::Vector3d v0p = p - v0;
-
-    double dot00 = v0v1.dot(v0v1);
-    double dot01 = v0v1.dot(v0v2);
-    double dot02 = v0v1.dot(v0p);
-    double dot11 = v0v2.dot(v0v2);
-    double dot12 = v0v2.dot(v0p);
-
-    double invDenom = 1.0 / (dot00 * dot11 - dot01 * dot01);
-    double u = (dot11 * dot02 - dot01 * dot12) * invDenom;
-    double v = (dot00 * dot12 - dot01 * dot02) * invDenom;
-
-    const double eps = 1e-10;
-    return (u >= -eps) && (v >= -eps) && (u + v <= 1.0 + eps);
-}
+// bool is_point_in_triangle(const Point& p0, const Point& p1, const Point& p2, const Point& query) {
+//     Eigen::Vector3d v0(p0[0], p0[1], p0[2]);
+//     Eigen::Vector3d v1(p1[0], p1[1], p1[2]);
+//     Eigen::Vector3d v2(p2[0], p2[1], p2[2]);
+//     Eigen::Vector3d p(query[0], query[1], query[2]);
+//
+//     Eigen::Vector3d v0v1 = v1 - v0;
+//     Eigen::Vector3d v0v2 = v2 - v0;
+//     Eigen::Vector3d v0p = p - v0;
+//
+//     double dot00 = v0v1.dot(v0v1);
+//     double dot01 = v0v1.dot(v0v2);
+//     double dot02 = v0v1.dot(v0p);
+//     double dot11 = v0v2.dot(v0v2);
+//     double dot12 = v0v2.dot(v0p);
+//
+//     double invDenom = 1.0 / (dot00 * dot11 - dot01 * dot01);
+//     double u = (dot11 * dot02 - dot01 * dot12) * invDenom;
+//     double v = (dot00 * dot12 - dot01 * dot02) * invDenom;
+//
+//     const double eps = 1e-10;
+//     return (u >= -eps) && (v >= -eps) && (u + v <= 1.0 + eps);
+// }
 
 void generate_trefoil(int nsamples, int normal_windings, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3>  &N1, Eigen::Matrix<double, Eigen::Dynamic, 3> &N2, Eigen::Matrix<double, Eigen::Dynamic, 3> &T){
     double r = 1.;
