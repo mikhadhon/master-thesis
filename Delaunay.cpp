@@ -7,11 +7,6 @@
 #include "polyscope/point_cloud.h"
 #include "polyscope/surface_mesh.h"
 
-typedef CGAL::Linear_algebraCd<FT> Linear_algebra;
-typedef Linear_algebra::Matrix Matrix;
-typedef Linear_algebra::Vector Vector;
-typedef Linear_algebra::RT RT;
-
 Delaunay::Full_cell_handle get_next_tetrahedron(Delaunay::Full_cell_handle &current_tet, Edge &edge, Delaunay::Vertex_handle current_opposite, Delaunay &dt) {
     for (int i = 0; i <= dt.maximal_dimension(); ++i) {
         auto neighbor = current_tet->neighbor(i);
@@ -232,7 +227,7 @@ void insert_points(std::vector<Point> &points, Delaunay &delaunay) {
         else {
             hint = delaunay.insert(*it);
         }
-        printf("Processing: %d/%d\n", ++i, static_cast<int>(points.size()));
+        // printf("Processing: %d/%d\n", ++i, static_cast<int>(points.size()));
     }
     if (!delaunay.is_valid()) {
         std::cerr << "Triangulation is invalid!" << std::endl;
@@ -250,19 +245,19 @@ bool is_index_two_critical_point(Face &face, Delaunay &dt) {
     double vertex0_direction = face_normal.dot(face_dual.vertex1.point - face_vertices[0]);
     double vertex1_direction = face_normal.dot(face_dual.vertex2.point - face_vertices[1]);
 
-    Eigen::VectorXd i = make_point_eigen(face.face.vertex(0)->point());
-    Eigen::VectorXd j = make_point_eigen(face.face.vertex(1)->point());
-    Eigen::VectorXd l = make_point_eigen(face.face.vertex(2)->point());
+    Point i = face.face.vertex(0)->point();
+    Point j = face.face.vertex(1)->point();
+    Point l = face.face.vertex(2)->point();
 
-    return (vertex0_direction * vertex1_direction < 0) && (j-i).dot(l-i) > 0 && (i-j).dot(l-j) > 0 && (i-l).dot(j-l) > 0;
+    return (vertex0_direction * vertex1_direction < 0) && dot()(Vector(j) - i, Vector(l) - i) >= 0 && dot()(Vector(i) - j, Vector(l) -j ) >= 0 && dot()(Vector(i) - l, Vector(j) - l) >= 0;
 }
 
 bool is_gabriel(Edge &edge, Delaunay &dt) {
-    Eigen::VectorXd p1 = make_point_eigen(edge.vertex1->point());
-    Eigen::VectorXd p2 = make_point_eigen(edge.vertex2->point());
+    Point p1 = edge.vertex1->point();
+    Point p2 = edge.vertex2->point();
 
-    Eigen::VectorXd edge_midpoint = (p1 + p2) / 2.0;
-    double sq_radius = (p1 - edge_midpoint).squaredNorm();
+    Point edge_midpoint = midpoint()(p1, p2);
+    FT sq_radius = squared_distance()(p1, edge_midpoint);
 
     std::vector<Delaunay::Full_cell_handle> cell_neighbors;
     get_incident_cells_to_vertices(edge, dt, cell_neighbors);
@@ -274,13 +269,12 @@ bool is_gabriel(Edge &edge, Delaunay &dt) {
         }
     }
 
-    const double eps = 1e-8;
     for (auto v : neighboring_vertices) {
         if (v == edge.vertex1 || v == edge.vertex2) continue;
         if (dt.is_infinite(v)) continue;
 
-        double sq_dist = (make_point_eigen(v->point()) - edge_midpoint).squaredNorm();
-        if (sq_dist < sq_radius - eps) {
+        FT sq_dist = squared_distance()(edge_midpoint, v->point());
+        if (sq_dist < sq_radius) {
             return false;
         }
     }

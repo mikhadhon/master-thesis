@@ -11,10 +11,12 @@ typedef K::Point_d Point;
 typedef K::FT FT;
 
 typedef CGAL::Delaunay_triangulation<K> Delaunay;
-typedef Delaunay::Geom_traits::Midpoint_d midpoint;
-typedef Delaunay::Geom_traits::Construct_circumcenter_d circumcenter;
-typedef Delaunay::Geom_traits::Squared_distance_d squared_distance;
-typedef Delaunay::Geom_traits::Contained_in_simplex_d contained_in_simplex;
+typedef K::Midpoint_d midpoint;
+typedef K::Construct_circumcenter_d circumcenter;
+typedef K::Squared_distance_d squared_distance;
+typedef K::Contained_in_simplex_d contained_in_simplex;
+typedef K::Scalar_product_d dot;
+typedef K::Vector_d Vector;
 
 struct Edge {
     Delaunay::Vertex_handle vertex1;

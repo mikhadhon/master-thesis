@@ -53,21 +53,21 @@ int main() {
     std::vector nvertices = {1000000};
     // for (int i = 1; i >= 1; i--) {
     for (auto n : nvertices) {
-        Eigen::Matrix<double, Eigen::Dynamic, 3> V;
+        Eigen::MatrixXd V;
         Eigen::MatrixXi F;
         Eigen::Matrix<double, Eigen::Dynamic, 3> N1;
         Eigen::Matrix<double, Eigen::Dynamic, 3> N2;
         Eigen::Matrix<double, Eigen::Dynamic, 3> T;
 
-        generate_trefoil(1000, 3, V, N1, N2, T);
+        //generate_trefoil(1000, 3, V, N1, N2, T);
         std::string filename = testfile + std::to_string(n);
         // std::string filepath = "../" + filename + ".ply";
         //std::string filepath = "../output/happy_vrip_res1000000_1000000_20260204_213045.obj";
-        std::string filepath = "../happy_vrip_res4.ply";
-        //read_ply(filepath, V, F);
+        std::string filepath = "../happy_vrip_res1.ply";
+        read_ply(filepath, V, F);
         //read_obj(filepath, V, F);
         std::vector<Delaunay::Point> points;
-        //gen_sphere_sample(1000000, 1, points);
+        //gen_sphere_sample(10000, 1, points);
 
 
         Eigen::MatrixXd B;
@@ -108,8 +108,8 @@ int main() {
 
         map_vertices_to_vector(delaunay3D, vertices, vertex_to_index);
         write_faces_to_vector(delaunay3D, faces, vertex_to_index);
-        auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
-        auto *pcCloud = polyscope::registerPointCloud("delaunay vertices", vertices);
+        //auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
+        //auto *pcCloud = polyscope::registerPointCloud("delaunay vertices", vertices);
 
         std::vector<Eigen::VectorXd> reconstructed_vertices = vertices;
         auto time_start = std::chrono::high_resolution_clock::now();
@@ -123,7 +123,7 @@ int main() {
         timestamps << points.size() << "," << float_ms.count() << std::endl;
 
         std::vector<Edge> gabriel_edges;
-        find_gabriel_edges(delaunay3D, gabriel_edges);
+        //find_gabriel_edges(delaunay3D, gabriel_edges);
 
         std::vector<std::array<size_t, 2>> ps_edges;
         for (auto edge: gabriel_edges) {
@@ -137,7 +137,7 @@ int main() {
         std::cout << "Number of vertices: " << reconstructed_vertices.size() << std::endl;
         std::cout << "Number of faces: " << faces.size() << std::endl;
 
-        if (!reconstructed_faces.empty() && false) {
+        if (!reconstructed_faces.empty()) {
             auto *psRecMesh = polyscope::registerSurfaceMesh("reconstructed mesh", reconstructed_vertices, reconstructed_faces);
 
             Eigen::MatrixXd V_out(reconstructed_vertices.size(), 3);
