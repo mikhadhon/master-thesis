@@ -43,15 +43,6 @@ Eigen::VectorXd make_point_eigen(Point point) {
     return eigen_point;
 }
 
-std::vector<Delaunay::Point> get_points_from_handles(const std::vector<Delaunay::Vertex_handle> &handles) {
-    std::vector<Delaunay::Point> points;
-    points.reserve(handles.size());
-    for (const auto& handle : handles) {
-        points.push_back(handle->point());
-    }
-    return points;
-}
-
 void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &points) {
     std::random_device rd{};
     std::mt19937 gen{ rd() };
@@ -78,53 +69,6 @@ void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &p
         points.push_back(Delaunay::Point(sphere_samples.row(i)[0], sphere_samples.row(i)[1], sphere_samples.row(i)[2] ));
     }
 }
-
-void gen_rectangle(int n, std::vector<Delaunay::Point> &points) {
-    std::random_device rd{};
-    std::mt19937 gen{ rd() };
-
-    std::uniform_real_distribution<> noise{ -0.0000001, 0.00000001 };
-
-    int size = n;
-
-    Eigen::MatrixXd samples((size + 1) * (size + 1), 3);
-
-    for (int i = 0; i < size; i++) {
-        for (int j = 0; j < size; j++) {
-            double x = -1, y = -1;
-            if (i == 0 || j == 0) {
-                x = i * (1 / (double)size);
-                y = j * (1 / (double)size);
-            }
-            else {
-                while (x > 1 || x < 0) {
-                    x = i * (1 / (double)size) + noise(gen);
-                }
-                while (y > 1 || y < 0) {
-                    y = j * (1 / (double)size) + noise(gen);
-                }
-            }
-            samples.row((size)*i + j) = Eigen::RowVector3d(x, y, 0);
-        }
-    }
-    for (int j = 0; j < size; j++) {
-        double x, y;
-        x = samples.row(j)(0) + 1;
-        y = samples.row(j)(1);
-        samples.row(size * size + j) = Eigen::RowVector3d(x, y, 0);
-    }
-    for (int i = 0; i <= size; i++) {
-        double x, y;
-        x = samples.row((size)*i)(0);
-        y = samples.row((size)*i)(1) + 1;
-        samples.row(size * (size + 1) + i) = Eigen::RowVector3d(x, y, 0);
-    }
-
-    for (int i = 0; i < samples.rows(); i++) {
-        points.push_back(Delaunay::Point(samples.row(i)(0), samples.row(i)(1), samples.row(i)(2)));
-    }
-}
-
 
 void map_vertices_to_vector(
     Delaunay &delaunay,
@@ -186,30 +130,6 @@ void generate_torus(int count, double radius, double rot_radius, std::vector<Del
         torus_samples.push_back(Delaunay::Point(x, y, z));
     }
 }
-
-// bool is_point_in_triangle(const Point& p0, const Point& p1, const Point& p2, const Point& query) {
-//     Eigen::Vector3d v0(p0[0], p0[1], p0[2]);
-//     Eigen::Vector3d v1(p1[0], p1[1], p1[2]);
-//     Eigen::Vector3d v2(p2[0], p2[1], p2[2]);
-//     Eigen::Vector3d p(query[0], query[1], query[2]);
-//
-//     Eigen::Vector3d v0v1 = v1 - v0;
-//     Eigen::Vector3d v0v2 = v2 - v0;
-//     Eigen::Vector3d v0p = p - v0;
-//
-//     double dot00 = v0v1.dot(v0v1);
-//     double dot01 = v0v1.dot(v0v2);
-//     double dot02 = v0v1.dot(v0p);
-//     double dot11 = v0v2.dot(v0v2);
-//     double dot12 = v0v2.dot(v0p);
-//
-//     double invDenom = 1.0 / (dot00 * dot11 - dot01 * dot01);
-//     double u = (dot11 * dot02 - dot01 * dot12) * invDenom;
-//     double v = (dot00 * dot12 - dot01 * dot02) * invDenom;
-//
-//     const double eps = 1e-10;
-//     return (u >= -eps) && (v >= -eps) && (u + v <= 1.0 + eps);
-// }
 
 void generate_trefoil(int nsamples, int normal_windings, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3>  &N1, Eigen::Matrix<double, Eigen::Dynamic, 3> &N2, Eigen::Matrix<double, Eigen::Dynamic, 3> &T){
     double r = 1.;

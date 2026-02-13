@@ -66,14 +66,6 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt) {
         current_tet = next_tet;
         current_opposite_vertex = new_opposite;
     } while (current_tet != start_tet && ordered_incident_cells.size() < incident_cells_to_edge.size());
-
-    // if (std::count(is_infinite_tet.begin(), is_infinite_tet.end(), true) == 2) {
-    //     std::cout << "[ ";
-    //     for (bool i : is_infinite_tet) {
-    //        std::cout << i << ",";
-    //     }
-    //     std::cout << "]" << std::endl;
-    // }
     
     std::vector<Voronoi_vertex> voronoi_vertices;
     std::vector<Voronoi_edge> voronoi_edges;
@@ -293,41 +285,6 @@ void get_incident_cells_to_vertices(Edge &edge, Delaunay &dt, std::vector<Delaun
             cell_neighbors.emplace_back(cell);
         }
     }
-    // std::set<Delaunay::Full_cell_handle> visited_cells;
-    // std::queue<Delaunay::Full_cell_handle> cell_queue;
-    //
-    // Delaunay::Full_cell_handle start_cell = vertex1->full_cell();
-    //
-    // cell_queue.push(start_cell);
-    // visited_cells.insert(start_cell);
-    //
-    // while (!cell_queue.empty()) {
-    //     Delaunay::Full_cell_handle current_cell = cell_queue.front();
-    //     cell_queue.pop();
-    //
-    //     if (current_cell->has_vertex(vertex2)) {
-    //         cell_neighbors.push_back(current_cell);
-    //     }
-    //
-    //     for (int i = 0; i < current_cell->maximal_dimension() + 1; ++i) {
-    //         Delaunay::Full_cell_handle neighbor = current_cell->neighbor(i);
-    //         if (neighbor->has_vertex(vertex1) && !visited_cells.contains(neighbor)) {
-    //             visited_cells.insert(neighbor);
-    //             cell_queue.push(neighbor);
-    //         }
-    //     }
-    // }
-}
-
-void orient_voronoi_edge(std::vector<Eigen::VectorXd> shared_facet_points, Eigen::VectorXd finite_voronoi_vertex, Eigen::VectorXd &voronoi_edge_direction) {
-    Eigen::VectorXd facet_center_estimate = shared_facet_points[0] + shared_facet_points[1] + shared_facet_points[2];
-    facet_center_estimate /= 3;
-    Eigen::VectorXd to_facet = facet_center_estimate - finite_voronoi_vertex;
-    int a = voronoi_edge_direction.size();
-    int b = to_facet.size();
-    if (voronoi_edge_direction.dot(to_facet) < 0) {
-        voronoi_edge_direction = -voronoi_edge_direction;
-    }
 }
 
 void get_facet_normal(std::vector<Eigen::VectorXd> &facet_points, Eigen::VectorXd &normal) {
@@ -341,27 +298,6 @@ void get_facet_normal(std::vector<Eigen::VectorXd> &facet_points, Eigen::VectorX
     Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeFullU);
     normal = svd.matrixU().col(2);
     normal = normal.normalized();
-}
-
-void get_voronoi_facet_vertices(const Edge& edge, const Delaunay& delaunay, std::vector<Eigen::VectorXd>& facet_vertices) {
-    Delaunay::Vertex_handle vertex1 = edge.vertex1;
-    Delaunay::Vertex_handle vertex2 = edge.vertex2;
-
-    std::vector<Delaunay::Full_cell_handle> v1_incident;
-    delaunay.incident_full_cells(vertex1, std::back_inserter(v1_incident));
-
-    std::set<Delaunay::Full_cell_handle> both_incident;
-
-    for (auto incident_cell : v1_incident) {
-        if (incident_cell->has_vertex(vertex2)) {
-            both_incident.insert(incident_cell);
-        }
-    }
-
-    for (auto cell : both_incident) {
-        Eigen::VectorXd center = simplex_circumsphere(cell);
-        facet_vertices.push_back(center);
-    }
 }
 
 void get_facet_vertices(const Delaunay &delaunay, const Delaunay::Facet_iterator &facet,
@@ -379,34 +315,6 @@ void get_facet_vertices(const Delaunay &delaunay, const Delaunay::Facet_iterator
             }
         }
     }
-}
-
-void extract_edges(Delaunay &delaunay, std::map<Delaunay::Vertex_handle, size_t> vertex_to_index, std::vector<std::array<size_t, 2>> &edges) {
-    std::set<Edge> unique_edges;
-    for (auto facet = delaunay.facets_begin(); facet != delaunay.facets_end(); ++facet) {
-        if (!delaunay.is_infinite(*facet)) {
-            std::vector<Delaunay::Vertex_handle> face_vertices;
-            get_facet_vertices(delaunay, facet, face_vertices);
-            if (face_vertices.size() == 2) {
-                unique_edges.insert(Edge(face_vertices[0], face_vertices[1], face_vertices[2]));
-            }
-        }
-    }
-    for (const auto &edge : unique_edges) {
-        edges.push_back(std::array{vertex_to_index[edge.vertex1], vertex_to_index[edge.vertex2]});
-    }
-}
-
-
-void calculate_driver(const Eigen::VectorXd &voronoi_vertex, const Edge &delaunay_edge, Eigen::VectorXd &driver) {
-    Eigen::VectorXd p1 = make_point_eigen(delaunay_edge.vertex1->point());
-    Eigen::VectorXd p2 = make_point_eigen(delaunay_edge.vertex2->point());
-
-    Eigen::VectorXd line_vec = p2 - p1;
-    Eigen::VectorXd point_vec = voronoi_vertex - p1;
-
-    double t = point_vec.dot(line_vec) / line_vec.squaredNorm();
-    driver = p1 + t * line_vec;
 }
 
 void find_gabriel_edges(Delaunay &dt, std::vector<Edge> &gabriel_edges) {

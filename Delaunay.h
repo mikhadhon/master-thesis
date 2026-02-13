@@ -8,6 +8,7 @@
 typedef CGAL::Dimension_tag<3> Dimension;
 typedef CGAL::Epeck_d<Dimension> K;
 typedef K::Point_d Point;
+typedef K::Vector_d Vector;
 typedef K::FT FT;
 
 typedef CGAL::Delaunay_triangulation<K> Delaunay;
@@ -16,7 +17,6 @@ typedef K::Construct_circumcenter_d circumcenter;
 typedef K::Squared_distance_d squared_distance;
 typedef K::Contained_in_simplex_d contained_in_simplex;
 typedef K::Scalar_product_d dot;
-typedef K::Vector_d Vector;
 
 struct Edge {
     Delaunay::Vertex_handle vertex1;
@@ -110,12 +110,5 @@ void get_facet_vertices(
 );
 
 void get_facet_normal(std::vector<Eigen::VectorXd> &facet_points, Eigen::VectorXd &normal);
-
-void orient_voronoi_edge(std::vector<Eigen::VectorXd> shared_facet_points, Eigen::VectorXd finite_voronoi_vertex, Eigen::VectorXd &voronoi_edge_direction);
-
-void extract_edges(Delaunay &delaunay, std::map<Delaunay::Vertex_handle, size_t> vertex_to_index, std::vector<std::array<size_t, 2>> &edges);
-
-void calculate_driver(const Eigen::VectorXd &voronoi_vertex, const Edge &delaunay_edge, Eigen::VectorXd &driver);
-
 
 #endif

@@ -15,13 +15,7 @@ void read_obj(const std::string &file_path, Eigen::MatrixXd &V, Eigen::MatrixXi 
 
 void gen_sphere_sample(int count, double radius, std::vector<Delaunay::Point> &points);
 
-void gen_rectangle(int n, std::vector<Delaunay::Point> &points);
-
-Point make_point(Eigen::VectorXd &eigen_point);
-
 Eigen::VectorXd make_point_eigen(Point point);
-
-std::vector<Delaunay::Point> get_points_from_handles(const std::vector<Delaunay::Vertex_handle> &handles);
 
 void map_vertices_to_vector(
     Delaunay &delaunay,
@@ -35,11 +29,7 @@ void write_faces_to_vector(
     std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index
 );
 
-void generate_circle(int nsamples, int normal_windings, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3> &N1, Eigen::Matrix<double, Eigen::Dynamic, 3>  &N2, Eigen::Matrix<double, Eigen::Dynamic, 3> &T);
-
 void generate_torus(int count, double radius, double rot_radius, std::vector<Delaunay::Point> &torus_samples);
-
-bool is_point_in_triangle(const Point& p0, const Point& p1, const Point& p2, const Point& query);
 
 void generate_trefoil(int nsamples, int normal_windings, Eigen::Matrix<double, Eigen::Dynamic, 3> &V, Eigen::Matrix<double, Eigen::Dynamic, 3>  &N1, Eigen::Matrix<double, Eigen::Dynamic, 3> &N2, Eigen::Matrix<double, Eigen::Dynamic, 3> &T);
 
