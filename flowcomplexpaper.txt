@@ -1,0 +1,248 @@
+The flow complex: A data structure for geometric modeling ✩
+Joachim Giesen a,∗, Matthias John b
+a Max-Planck-Institut für Informatik, Department 1: Algorithms and Complexity, Stuhlsatzenhausweg 85, 66123 Saarbrücken, Germany b Institut für Theoretische Informatik, ETH Zurich, Universitätstraße 6, 8092 Zürich, Switzerland
+Received 30 January 2006; received in revised form 18 December 2006; accepted 15 January 2007
+Available online 25 April 2007
+Communicated by K. Mehlhorn
+Abstract
+We study a special case of the critical point (Morse) theory of distance functions namely, the gradient flow associated with the distance function to a finite point set in R
+3. The fixed points of this flow are exactly the critical points of the distance function. Our main result is a mathematical characterization and algorithms to compute the stable manifolds, i.e., the inflow regions, of the fixed points. It turns out that the stable manifolds form a polyhedral complex that shares many properties with the Delaunay triangulation of the same point set. We call the latter complex the flow complex of the point set. The flow complex is suited for geometric modeling tasks like surface reconstruction. © 2007 Elsevier B.V. All rights reserved.
+Keywords: Delaunay triangulation; Critical point theory of distance functions
+1. Introduction
+In applications point sets often come unstructured, which does not mean, however, that their distribution is arbitrary. For example the input of the surface reconstruction problem is just a finite set of points, but the points are constrained to lie on the surface of some solid. In geometric modeling one asks for a geometric model of such constraints. In surface reconstruction that would be a model of the surface from which the points are sampled. A popular way to model such constraints is as a simplicial complex. In fact surfaces were successfully modeled as sub-complexes of the Delaunay triangulation of the sample points [1–4].
+The approach we are presenting here is deeply related to another surface reconstruction algorithm, namely, Edels-brunner’s Wrap algorithm [6] which, like the approaches mentioned before, computes the reconstruction as a subset of the triangles of the Delaunay triangulation. The Wrap algorithm makes use of a flow relation that was introduced earlier by Edelsbrunner et al. to model cavities in macromolecules [7]. One of our results is to show how to compute the flow that underlies the flow relation exactly. But the main purpose of this paper is to introduce the flow complex
+✩ Partly supported by the IST Programme of the EU as a Shared-cost RTD (FET Open) Project under Contract No IST-2000-26473 (ECG— Effective Computational Geometry for Curves and Surfaces). Also partly supported by the Max-Planck Center for Visual Computing and Communication (MPC-VCC).
+* Corresponding author. E-mail address: giesen@inf.ethz.ch (J. Giesen).
+0925-7721/$ – see front matter © 2007 Elsevier B.V. All rights reserved. doi:10.1016/j.comgeo.2007.01.002
+J. Giesen, M. John / Computational Geometry 39 (2008) 178–190 179
+as an alternative to the Delaunay triangulation and demonstrate that is also well suited for surface reconstruction. The flow complex is closely related to the Delaunay triangulation, but neither complex is a sub-complex of the other. The striking difference is that it seems much easier to extract a surface from the flow complex than from the Delaunay triangulation. It turns out that the flow complex without any further processing describes a reasonably sampled sur-face already quite well, in contrast to the Delaunay triangulation, which has to be processed in order to provide an approximation other than the convex hull of the sample points. We will demonstrate this briefly at the end of this paper.
+Though we applied the flow complex successfully in applications, the focus of this paper is on the theory that lies behind the definition and computation of the flow complex. The starting point of our study is a distance function asso-ciated with a finite set of sample points in R
+3. This function assigns to every point in R 3 its least distance to any of the
+sample points. It is intimately related to the Voronoi diagram of the sample points. The distance function has a unique direction of steepest ascent at almost every point. The points where such a direction does not exist are the critical points of the distance function, i.e. its local extrema and saddle points. We study where a point in R
+3 flows if it always follows the direction of steepest ascent of the distance function. It turns out that all non-critical points either flow into a local maximum, a saddle point or to infinity. The set of all points that flow into a critical point is called the stable manifold of this critical point. We call the collection of all stable manifolds the flow complex of the sample points.
+The main contributions of this paper are new insights in a distance function that was already well studied in the con-text of Voronoi diagrams and Delaunay triangulations. These insights lead to the definition of a new data structure—the flow complex—that we have successfully applied in surface reconstruction. In particular, we give an efficient algo-rithm to compute the flow complex and prove its correctness. An extended abstract of this paper appeared in [11].
+2. Diagrams and critical points
+In this section we summarize, following [8], the basic notions that we will use throughout the paper.
+Voronoi diagram. Let P be a finite set of points in R 3. The Voronoi cell of p ∈P is given as
+Vp = { x ∈R
+3: ∀q∈P − {p}, ‖x − p‖  ‖x − q‖}. The sets Vp are convex polyhedra. Closed facets shared by two Voronoi cells are called Voronoi facets, closed edges shared by three or more Voronoi cells are called Voronoi edges and the points shared by four or more Voronoi cells are called Voronoi vertices. The term Voronoi object can denote either a Voronoi cell, facet, edge or vertex. The Voronoi diagram of P is the collection of all Voronoi objects. It defines a cell decomposition of R
+3. Delaunay diagram. The Delaunay diagram of a set of points P is dual to the Voronoi diagram of P . The convex
+hull of four or more points in P defines a Delaunay cell if the intersection of the corresponding Voronoi cells is not empty and there exists no superset of points in P with the same property. Analogously, the convex hull of three or two points defines a Delaunay face or Delaunay edge, respectively, if the intersection of their corresponding Voronoi cells is not empty. Every point in P is called Delaunay vertex. The term Delaunay object can denote either a Delaunay cell, face, edge or vertex. The Delaunay diagram defines a decomposition of the convex hull of all points in P . This decomposition is a triangulation if the points are in general position.
+We always refer to the interior and to the boundary of Voronoi/Delaunay objects with respect to their dimension. For example the interior of a Delaunay edge contains all points in this edge except the endpoints and the interior of a vertex and also its boundary are the vertex itself. Furthermore, we always assume general position unless stated differently.
+Distance function. Let P be a finite set of points in R 3. The distance function induced by P is given as
+h(x) = min {‖x − p‖2: p ∈P
+} .
+The graph of the distance function h is the lower envelope of a set of paraboloids centered at the points in P . Thus the function h is continuous. It is smooth everywhere besides at points which have the same distance from two or more points, i.e. at points that lie on the boundary of a Voronoi cell. See Fig. 1 for an example.
+Regular- and critical points. Following the critical point theory for distance functions developed in Riemannian geometry [13] we define the gradient of a distance function h at x as a set Γ(x) of unit vectors. In case that h is smooth at x we set Γ(x) = ∇h/‖∇h‖or {0} if ∇hvanishes at x. At all other points, i.e. points that lie on the boundary of
+https://lh3.googleusercontent.com/notebooklm/AG60hOo7XD5YeIcwnOPEIolA2P3KThw8hkBjlS4MyBiFtO_De-nMeClQQt4U_zB5WHY-_sAsjZVVbpkZPpnVi516GFz-EtqjqvIuXDIM8JQL5YquQuv6IQ8PvtCjC1dPa28NgPaDcElJDg=w445-h231-v0
+180 J. Giesen, M. John / Computational Geometry 39 (2008) 178–190
+Fig. 1. A one-dimensional example that shows the graph of the distance function induced by three points.
+a Voronoi cell, let Γ(x) be the set of unit vectors p−x ‖p−x‖ with points p ∈P for which ‖x − p‖ = h(x). Note that in
+the latter case Γ(x) contains more than one vector. The distance function h is regular at x if Γ(x) is contained in an open hemisphere of S
+2. Otherwise we say that it is critical at x. Note that the zero vector is not contained in any open hemisphere of S
+2. Thus critical points of a smooth function are also critical in this more general setting. We define the index of a critical point as the dimension of the span of the vectors in Γ(x). Critical points of index 0 and 3 are local minima and maxima, respectively. Critical points of index 1 and 2 are called saddle points.
+The statement of the following lemma was already known before [6]. Here we present the first proof in the context of the critical point theory of distance functions [13].
+Lemma 1. Let P be a finite set of points such that Voronoi and their dual Delaunay objects intersect in their interiors if they intersect at all. Then the critical points of the distance function h are the intersection points of Voronoi objects V and their dual Delaunay object σ. The index of a critical point is the dimension of σ.
+Proof. First, we show that every such intersection point is critical. We distinguish two cases either the dimension of σis zero or it is positive. Let x denote the intersection point.
+If σis zero-dimensional we have Γ(x) = {0}. By definition x is a Delaunay vertex and h is smooth at x with vanishing gradient. Thus the gradient of x is not contained in an open hemisphere of S
+2. Thus x is critical with index 0.
+If σis d-dimensional with 0 < d  3 then x lies in the interior of a (3 − d)-dimensional Voronoi object that contains all points that have the same distance from the Delaunay vertices in the boundary of σ. Hence the set Γ(x)
+contains the unit vectors pointing from x to these Delaunay vertices. It cannot be contained in an open hemisphere of S
+2 since x is contained in the interior of σwhich is the convex hull of the Delaunay vertices in the boundary of σ. The span of Γ(x) is d-dimensional for the same reason. Thus x is critical with index d .
+It remains to show that all critical points are intersection points of Delaunay objects and their dual Voronoi objects. Again we distinguish two cases either the index of the critical point x is 0 or it is positive.
+If x has index 0 then h has to be smooth at x with vanishing gradient. Such points are exactly the Delaunay vertices. In the second case x has index d with 0 < d  3. Let P ′ be the set of points that define the unit vectors in Γ(x).
+The point x must have the same distance from all points in P ′ and larger distance from all points not in P ′ by the definition of Γ(x). Hence x is contained in the Voronoi cells of all points in P ′. By the definition of Delaunay objects the convex hull of the Delaunay vertices of the points in P ′ has to be a d-dimensional Delaunay object σand x is contained in the dual Voronoi object of σ. Since Γ(x) is not contained in an open hemisphere of S
+2 the point x has to be contained in the convex hull of the Delaunay vertices of the points in P ′, i.e. in σ. That shows that x is the intersection point of σwith its dual Voronoi object. 
+In the following we always assume that Voronoi and their dual Delaunay objects intersect in their interiors if they intersect at all. Other intersections are degenerate in the sense that they are not stable under small perturbations of the point set.
+3. Induced flow
+We want to study how the points in R 3 move if they always follow the direction of steepest ascent of the distance
+function h. The curve that a point x ∈R3 follows during this motion is called the orbit of x. For smooth distance
+https://lh3.googleusercontent.com/notebooklm/AG60hOp62bI3aCC4i9yqmo0buiQVM-TvHbFU8gq4d114lEIjsGZ72EHiKxB8pQ4RgjpCt-UDcu4ig2cvyamc-auLGwq2F6_Pm3vQOzJH6dElANSmoFZ6G57d-FF1_DGML7qaW6qwh9JMFQ=w445-h239-v0
+https://lh3.googleusercontent.com/notebooklm/AG60hOrzpnVcHW5jyFXbVWWcAwYOVcw6-ArhWuqjb-vcya0wEmTE952xG3VWvnoVPbxDrK5Ks0QqdyMnE2hVuc_9AghRFR_rYgqIE7Nqym0WyZcjHBYVKx0mK7aWq8u5Z_bGMuybIeEv=w239-h303-v0
+J. Giesen, M. John / Computational Geometry 39 (2008) 178–190 181
+Fig. 2. The critical points of the distance function from Fig. 1 and the direction of steepest ascent of the distance function at one point. Note that in one dimension the only critical points of the distance function are local minima  and local maxima ⊕.
+Fig. 3. A two-dimensional example that shows four orbits of the flow induced by seven points. The Voronoi diagram of the point set is also shown.
+functions the computation of a single orbit results in the solution of an ordinary differential equation. Since the distance function h is not smooth everywhere, we cannot apply the theory of ordinary differential equations here. Nevertheless individual orbits can also be computed for h. An essential ingredient of this computation is the notion of the driver of a point x ∈R
+3. Driver. Given x ∈R
+3. Let V be the lowest dimensional Voronoi object in the Voronoi diagram of P that contains x and let σbe the dual Delaunay object of V . The driver of x is the point on σclosest to x.
+That is, the driver of x is a point d ∈R 3 such that the direction of the vector x − d is the direction of the steepest
+ascent of h at x. Thus knowing the driver of x means knowing in which direction x is going to move. See Fig. 2 for an example.
+The individual orbits of the points in R 3 can be derived from a so called flow on R
+3 which is a function from [0,∞)× R
+3 to R 3.
+Induced flow. The flow φinduced by a finite point set P is given as follows: For all critical points x of the distance function associated with P we set:
+φ(t,x) = x, t ∈[0,∞).
+Otherwise let y be the driver of x and R be the ray originating at x and shooting in the direction x − y. Let z be the first point on R whose driver is different from y. Note that such a z need not exist in R
+3 if x is contained in an unbounded Voronoi object. In this case let z be the point at infinity in the direction of R. We set:
+φ(t,x) = x + t x − y
+‖x − y‖ , t ∈[ 0,‖z − x‖].
+For t > ‖z − x‖ the flow is given as follows:
+φ(t,x) = φ( t − ‖z − x‖ + ‖z − x‖, x
+)
+= φ( t − ‖z − x‖, φ
+(‖z − x‖, x ))
+.
+We will show later that the function φis well defined. Orbits and fixed points. Given x ∈R
+3 and an induced flow φ.The curve
+φx: [0,∞)→R 3, t $→ $φ(t,x)
+is called the orbit of x. See Fig. 3 for an example in the plane. A point x ∈R 3 is called a fixed point of φif φ(t,x) = x
+for all t  0.
+182 J. Giesen, M. John / Computational Geometry 39 (2008) 178–190
+Observation 1. The following is true.
+(1) The fixed points of φare the critical points of the distance function h. (2) The orbits of φare piecewise linear curves that are linear in Voronoi objects.
+Because of the first observation we refer to a fixed point of φas a minimum, saddle or maximum if the correspond-ing critical point of the distance function is a minimum, saddle point or maximum, respectively.
+Lemma 2. The flow φhas no closed orbits.
+Proof. Observe that for every x ∈R 3 the distance function associated with P is growing along the orbit φxfor all
+values t ∈[0,∞)such that φx(t)is not a fixed point of φ.Thus there are no closed orbits possible.  The following lemmas prepare the well-foundedness proof (Theorem 1) for the induced flow.
+Lemma 3. All points in the interior of a Voronoi object V have the same driver.
+Proof. Remember that for x ∈R 3 its driver is a point y ∈σthat is closest to x where σis the Delaunay object dual
+to the lowest dimensional Voronoi object V that contains x. Since the affine hulls of V and σare orthogonal to each other they intersect in exactly one point. Let z be this
+intersection point. Let y ∈σbe the point closest to z. Note that it is possible that y = z. Since all vectors y′ − z with y′ ∈σare orthogonal to all vectors x − z with x in the affine hull of V we have by Pythagoras theorem for all x in the affine hull of V and all y′ ∈σ,
+‖x − y′‖2 = ‖x − z‖2 + ‖z − y′‖2
+ ‖x − z‖2 + ‖z − y‖2
+= ‖x − y‖2.
+Thus y is the closest point on σfor all x in the interior of V , i.e. y is the driver of all these points.  Corollary 1. The flow φhas only finitely many drivers.
+Power and power distance. We want to assign a weight to every driver and refer to this weight as the power of the driver. Let d be a driver and V be the highest dimensional Voronoi object whose interior points are driven by d . Let σbe the dual Delaunay object of V . Let x = argminx′∈V‖x′ − d‖. The power rd assigned to d is defined by the following expression,
+rd = ‖x − d‖2 − ‖x − p‖2 for any p ∈P ∩σ.
+Here P is the finite set of points that induces the flow. Observe that
+(1) The definition of the power rd is independent of the choice of p ∈P ∩σ. (2) If d ∈P then the power of d is zero.
+The power distance of a point y ∈R 3 from d is defined as
+πd(y)= ‖y − d‖2 − rd .
+The proof of the following lemma shows that the definition of power for a driver does not depend on the specific choice of x. Every point in V would lead to the same value for the power.
+Lemma 4. Let d be a driver and V be the highest dimensional Voronoi object whose interior points are driven by d . Let σbe the dual Delaunay object of V and let p ∈P ∩σ. The power distance πdon V is just the squared Euclidean distance from p.
+J. Giesen, M. John / Computational Geometry 39 (2008) 178–190 183
+Proof. Let y ∈V arbitrary and x = argminx′∈V‖x′ − d‖. We have by the definition of power,
+πd(y)= ‖y − d‖2 − rd
+= ‖y − d‖2 − ‖x − d‖2 + ‖x − p‖2.
+Remember that the driver d is the closest point in σto the intersection point z of the affine hulls of V and σ. The vectors d − z and x − z are orthogonal to each other, because we have d ∈σand x ∈V . Hence we get
+‖x − d‖2 = ‖x − z‖2 + ‖z − d‖2,
+which follows from Pythagoras’ theorem. From an analogous reasoning we obtain
+‖x − p‖2 = ‖x − z‖2 + ‖z − p‖2.
+This leads to
+πd(y)= ‖y − d‖2 − ‖z − d‖2 + ‖z − p‖2.
+We apply an analogous reasoning a third and a fourth time to get
+‖y − d‖2 = ‖y − z‖2 + ‖z − d‖2
+and
+‖y − p‖2 = ‖y − z‖2 + ‖z − p‖2
+which leads to
+πd(y)= ‖y − p‖2 = πi(y). Lemma 5. The power of the drivers in the sequence of drivers associated with an orbit φxis always monotone decreasing. Hence every driver occurs at most once in the sequence of drivers associated with φx.
+Proof. For every z ∈R 3 let Dz be the set of potential drivers in the neighborhood of z (or short potential drivers of
+z), i.e. all drivers contained in the Delaunay object dual to the lowest dimensional Voronoi object V that contains z. Let us collect some properties of Dz.
+(1) According to Lemma 3 the set Dz is always finite. (2) For every z′ sufficiently close to z we have Dz′ ⊂Dz, because V has the smallest dimension among all Voronoi
+objects that have a non-empty intersection with a sufficiently small neighborhood of z and all these Voronoi objects have a non-empty intersection with V , i.e. the dual Delaunay objects of all these Voronoi objects are contained in the dual Delaunay object of V .
+Let t ∈(0,∞)be such that the driver d of φx(t)is different from the driver of φx(t− ε)for all sufficiently small ε> 0. The orbit φxis continuous by definition. Thus we have for a fixed ε> 0 which is sufficiently small that the driver d ′ of φx(t− ε)is a potential driver of φx(t).That is,
+∥∥φx(t)− d ∥∥<
+∥∥φx(t)− d ′∥∥.
+On the other hand we have from Lemma 4
+πd
+( φx(t)
+) = πd′ ( φx(t)
+)
+since φx(t)lies in the boundary of the lowest dimensional Voronoi object that contains φx(t− ε).This and the definition of power distance imply that the power of d has to be smaller than the power of d ′.  Theorem 1. The mapping φis a well defined function, i.e. it is defined for every (t, x) ∈[0,∞)× R
+3.
+Proof. By construction there exists an ε> 0 for every x ∈R 3 such that φis defined on {x} × [0, ε),i.e. φxis defined
+on [0, ε).This already implies that φxis defined on the whole of [0,∞)since φxis locally defined for every driver and the sequence of drivers associated with φxis finite according to Corollary 1 and Lemma 5. 
+https://lh3.googleusercontent.com/notebooklm/AG60hOp6RoP4svSUycuRDJmoekHMnKXe2Z2H3DcjLa2m9mSxl-hM4GW1imVV0ZKrPsGOx56QhUJHwVNntgx7lNbGKsvDTnAG8GF7ulyLeaa7lDCpsfRj9Q0Ht8mrPblLb1uh-GxZppYnnA=w662-h281-v0
+184 J. Giesen, M. John / Computational Geometry 39 (2008) 178–190
+Fig. 4. A two-dimensional example of a stable manifold of a maximum ⊕(on the left) and its smoothed version on the right.
+4. Stable manifolds and the flow complex
+We are not really interested in the individual orbits of the points, but want to look on the flow on a coarser level. Therefore we group all points together that flow into the same fixed point of the flow. We do this be using a well known concept from Morse theory, namely, stable manifolds of the fixed points of a flow.
+Stable manifolds. Given an induced flow φ.The stable manifold S(x) of a fixed point x ∈R 3 contains all points
+that flow into x, i.e.
+S(x) = { y ∈R
+3: lim t→∞φy(t)= x
+} .
+Instead of directly working with stable manifolds of critical points we introduce a smoothed version which has nicer properties. Smoothing essentially means taking the closure of the stable manifold. Degenerate situations that we discuss later, see Fig. 6, will explain why the following definition is more complicated. Essentially, in degenerate situations the stable manifold of an index i critical point can have parts of dimension higher than i that we remove with the following definition.
+Smoothed stable manifolds. Let x be a critical point of index i of an induced flow. Let S be the set of points in S(x) that have a neighborhood in S(x) that is homeomorphic to an open subset of R
+d, d = i+1, . . . ,3. Let S′ be the boundary of S(x) − S in R
+3. The smoothed stable manifold of x is the set S∗(x) = (S(x) − S) ∪S′. See Fig. 4 for an example of smoothing the stable manifold of a maximum in the plane.
+An induced flow in R 3 has four different types of fixed points, local minima, saddle points of index 1, saddle points
+of index 2 and local maxima. In the following we are going to characterize the smoothed stable manifolds of the four different types of fixed points.
+Observation 2. The smoothed stable manifold of a local minimum m contains just the point m itself since no other point flows into m.
+It turns out that the stable manifold of an index 1 saddle point is always a Gabriel edge and vice versa. Gabriel graph. The Gabriel graph of a finite set of points P in R3 is given as follows: Its vertices are the points in
+P and its edges are given by Delaunay edges that intersect their dual Voronoi facet. The edges of the Gabriel graph are called Gabriel edges. The Gabriel graph is always connected, because it contains the minimum spanning tree of P .
+Lemma 6. Let s be an index 1 saddle of φ.The smoothed stable manifold S∗(s) of s is a Gabriel edge and every Gabriel edge is the smoothed stable manifold of some index 1 saddle.
+Proof. Every Delaunay edge that contains some index 1 saddle is a Gabriel edge and vice versa by Lemma 1 and the definition of Gabriel edges, respectively. It remains to show that the smoothed stable manifold S∗(s) of every index 1 saddle s is a Gabriel edge.
+Let E be the Delaunay edge that contains s. By the definition of φall interior points of E belong to S(s). Hence E ⊂S∗(s). We want to show that E = S∗(s). Assume there exists x ∈S∗(s) with x /∈E. By the definitions of S∗(s) and E that means that there exists y ∈S(s) but y /∈E.
+Since E contains s the orbit of y cannot be disjoint from the interior of E, i.e. φyhas to join E at some point z
+for the first time and to stay in E afterwards. The point y must be driven into z by one of the potential drivers of z.
+https://lh3.googleusercontent.com/notebooklm/AG60hOrxj_pi1F677Q5D_o124cWBnIO_u6Pvhbw9ePIvFGrSqVAtL15HjvKRnp4Y6A6x9Ax8ZAYFbqF2MdNq9PkQu7fT0b7uUnQjCguMFsq96VEEycylofld86sT8vxnmEdKvGjsDfPJ=w610-h180-v0
+J. Giesen, M. John / Computational Geometry 39 (2008) 178–190 185
+Fig. 5. Two examples of polygons that are contained in F and whose interior points flow into s. The polygon on the right has one index 1 saddle point on its boundary.
+Remember, these are all drivers that are contained in the Delaunay object dual to the lowest dimensional Voronoi object that contains z. The (potential) driver of the interior points in E − {s} is one of the endpoints of E. The point s
+has both of these endpoints and s itself as potential drivers. Thus y must be driven into z by one of the endpoints of E, because s itself cannot drive y into s. But that means that z cannot be the first point on the orbit φythat is contained in E. That is a contradiction. Thus we have S∗(s) = E.  Lemma 7. Let s be an index 2 saddle of φ.If the stable manifold S(s) of s does not contain a Voronoi vertex then S∗(s) is a piecewise linear surface with boundary consisting of Gabriel edges.
+Proof. Assume that s is a saddle of index 2 such that S(s) does not contain a Voronoi vertex. According to Lemma 1 we have that s is the intersection point of a Delaunay facet F and its dual Voronoi edge E.
+We are going to construct the surface explicitly. We start with the construction of a polygon P whose interior points flow into s. This polygon contains s and is contained itself in F . Since we assume general position there are three Voronoi facets incident to E. The drivers of these facets are points on Delaunay edges in the boundary of F . Such a driver might be a saddle of index 1. Consider a driver d which is not a saddle of index 1. The line segment that connects d with s is contained in F and intersects the boundary of the corresponding Voronoi facet in two points, namely in s and in a second point s′. We get a polyline, i.e. a simple piecewise linear curve, from the two segments that connect s′ to the two Delaunay vertices incident to the Delaunay edge that contains d . If the driver of the Voronoi facet is a saddle of index 1 we take its dual Delaunay edge as the polyline. That is, we get three polylines all contained in F , one for each Voronoi facet incident to E. Let P be the polygon whose boundary is given by these polylines. P is contained in F and all its interior points flow into s, see Fig. 5. It can be triangulated by connecting s with the points s′ and the Delaunay vertices incident to F .
+Let s′ be a point as constructed above for a Voronoi facet that is not driven by a saddle of index 1. By construction s′ is contained in a Voronoi edge E′. Furthermore, by our assumption it has to be an interior point of E′. Since we assume general position E′ is incident to three Voronoi facets. For one of these Voronoi facets we have already computed a polyline. For the remaining two we do it exactly the same way we did it above for P . Thus we have again three polylines, one for each Voronoi facet incident to E′. Two of these polylines always intersect in their common Delaunay vertex. That is, the three polylines together form a polyline which is homeomorphic to S
+1. The latter polyline need not be contained in a hyperplane but it can be triangulated by connecting the point s′ with newly computed points s′ and to the Delaunay vertices incident to the Delaunay facet dual to E′. This gives us a new triangulated surface patch whose interior points all flow into s via s′.
+We continue with the above construction until there are no more points s′ left for which we have not already constructed a surface patch. The constructed surface patches cannot intersect each other or themselves, because this would mean that there are points which flow into two directions. This is impossible by the definition of φ.Hence the construction gives us a triangulated surface T with boundary whose points all belong to S∗(s) though not all of them belong to S(s). By construction the boundary of the surface is made up from Gabriel edges, i.e. Delaunay edges that contain an index 1 saddle.
+So far we know that T ⊂S∗(s). Next we want to show T = S∗(s). Assume there exists x ∈S∗(s) with x /∈T . By the definitions of S∗(s) and T this implies that there exists y ∈S(s) but y /∈T .
+Since s ∈T the orbit φyof y cannot be disjoint from the interior of the surface T , i.e. φyhas to join T at some point z and to stay in T afterwards. The point y must be driven into z by one of the potential drivers of z. These are all drivers that are contained in the Delaunay object dual to the lowest dimensional Voronoi object that contains z. The point z cannot be an interior point of a Voronoi cell, because two orbits cannot meet in the interior of a Voronoi cell by
+https://lh3.googleusercontent.com/notebooklm/AG60hOquNjKBJMcsvS97fOQuUhE5FXKJGZYG48dktepPOqr8aM8mT0LhZPHBV54_L9r7l9keb9pw7lXvoIhDTqwOA-ZCpKJhr5tpHPoE3APQRQwfIKPx7hM-3ZSTXk7vHXe87aia2hqI7A=w445-h167-v0
+186 J. Giesen, M. John / Computational Geometry 39 (2008) 178–190
+Fig. 6. An example of an index 2 saddle point  whose stable manifold contains a Voronoi vertex ◦. The inflow region of this Voronoi vertex is three-dimensional. That is, the shown stable manifold contains two and three-dimensional parts.
+the definition of φ.That is, the point z is either an interior- or a boundary point of a Voronoi facet, i.e. an interior point of a Voronoi edge. Let us first discuss the case that z is an interior point of a Voronoi facet. The potential drivers of z
+are the driver of the Voronoi facet that contains z and the endpoints of the Delaunay edge dual to this Voronoi facet. But by construction T contains the intersection of a small neighborhood of z with the line segments connecting z to these three drivers. Hence z cannot be the first point on the orbit φywhich is contained in T . That is a contradiction. Now assume that z is an interior point of a Voronoi edge. The only interior points of Voronoi edges contained in T
+are the points s′ in the above construction. The Delaunay facet dual to the Voronoi edge that contains z contains six drivers. These drivers are its three incident Delaunay vertices and one driver on every of its three incident Delaunay edges. It does not contain a driver in its interior since by construction it is not intersected by the affine hull of its dual Voronoi edge. This implies also that the driver that we used to construct s′ cannot drive y into z. This driver is one of the drivers on the Delaunay edges. But by construction T contains the intersection of a small neighborhood of z with the line segments connecting z to the remaining five drivers. Hence z cannot be the first point on the orbit φywhich is contained in T . That is a contradiction. Hence S∗(s) = T . 
+Note that we do not claim that the surface is homeomorphic to a disk. In fact, the surface need not be simply connected, i.e. it can have holes.
+The example in Fig. 6 shows that the lemma does no longer hold if S(s) contains a Voronoi vertex. But the latter is a very degenerate situation, i.e. it is not stable under small perturbations of the initial point set. This example also motivates our definition of smoothed stable manifolds which basically says that we only keep the boundaries of three-dimensional inflow regions of an index 2 saddle point.
+In the following we assume that none of the stable manifolds of index 2 saddle points contains a Voronoi vertex. Flow complex. Given a finite set of points in R
+3. We call the simplicial complex build by the Gabriel graph and the triangulated surfaces from Lemma 7 the flow complex of the point set. Since the latter surfaces need not be made up from Delaunay triangles (once we construct a point s′ there are triangles in the triangulation that are not Delaunay triangles), we have that the flow complex is not a sub-complex of the Delaunay triangulation. Note that under our non-degeneracy assumption also the stable manifolds whose critical points have an index less than 3 form a complex.
+It remains to characterize the stable manifolds of the maxima. There we need the following technical lemma.
+Lemma 8. Let K be the set of all points that do not flow to infinity, i.e.
+K = R 3 − {
+x ∈R 3: ∀n∈N, ∃tn 0 s.t. ∀t> tn ‖φx(t)− 0‖ > n
+} .
+Let S be the set of all saddle points, M be the set of all maxima and M ′ be the set of all minima of φ.The set C = {S(y): y ∈S ∪M} covers K − M ′, i.e. every x ∈K that is not a minimum is contained in exactly one stable manifold S(y) of some saddle point or maximum y of φ.
+Proof. Let x be a point in K −M ′. The point x cannot belong to the stable manifolds of more than one point, because once φxreaches a critical point it stays there. We have to show that x belongs to the stable manifold of some saddle or maximum.
+Let V be the set of all Voronoi objects of the Voronoi diagram of P . We associate with x a function
+Vx : [0,∞)→V
+that maps every point of time t to the lowest dimensional Voronoi object that contains φx(t).Let (tn) be an ordered sequence of points in time such that Vx(tn) = Vx(tn+1) and there is no t ∈(tn, tn+1) with Vx(t) /∈{Vx(tn),Vx(tn+1)}.
+J. Giesen, M. John / Computational Geometry 39 (2008) 178–190 187
+According to Lemma 5 the associated sequence (Vx(tn)) of Voronoi objects has to be finite. That is, φxfinally stays either in a Voronoi vertex or a finite Voronoi edge, facet or cell. In the first case the Voronoi vertex has to be a maximum, i.e. x belongs to the stable manifold of this maximum. In the second and third case φxhas to stay in a saddle of index 1 or 2, respectively, i.e. x belongs to the stable manifold of this saddle. The fourth case is not possible by the construction of φ. Theorem 2. The smoothed stable manifolds of the maxima of φare exactly the closures of the bounded regions of the stable flow complex provided no stable manifold of an index 2 saddle contains a Voronoi vertex.
+Proof. The Euler characteristic of the flow complex can be computed as an alternating sum of Betti numbers χ= −β3+β2−β1+β0,see [14]. All Betti numbers are non-negative. The third Betti number β3is zero for trivial reasons. The second Betti number β2counts the number of non-bounding shells, i.e. the number of bounded regions of the flow complex, i.e., the bounded components of the complement of the flow complex in R
+3. The zeroth Betti number counts the number of connected components. The connectedness of the Gabriel graph and the construction of the surfaces in Lemma 7 imply that the stable flow complex is connected. Hence β0= 1. Combining all these informations we get
+# bounded regions of the flow complex  χ− 1.
+There is another way to compute the Euler characteristic of a simplicial complex. That is χ= ∑3i=0(−1)ici , where
+ci denotes the number of i-dimensional simplices in the complex. By construction the flow complex is a simplicial complex and we have c3 = 0. To compute the remaining numbers let us recall the construction of the surfaces in Lemma 7. We will count how many vertices, edges and triangles besides vertices and edges on its boundary every surface contributes to the computation of the Euler characteristic χ. Remember that we constructed these surfaces from patches. We first constructed a polygon P with one inner vertex (the saddle of index 2) and as many inner edges as triangles. We will later take care of the vertices and edges in the boundary of P . Thus the contribution to χis 1. Every other patch has one vertex and two edges incident to an already constructed patch plus one more triangle than inner edges. Hence the contribution of any such patch to χis zero. The only vertices and edges of the flow complex that we have not considered so far are exactly the original points and the Gabriel edges. The original points are just the minima of the flow φand the Gabriel edges are in a one-to-one correspondence with the saddles of index 1. The reasoning above shows that all other contributions to χcan be subsumed in a contribution of 1 for every saddle of index 2. Thus we have
+χ= # saddles of index 2 − # saddles of index 1 + # minima.
+Note that the same relation also follows from the complex structure of the stable manifolds whose critical points have an index less than 3. From a generalization of a theorem of Siersma [15], which follows from a Morse theoretic analysis of the distance function, we know that
+−1 = # maxima − # saddles of index 2 + # saddles of index 1 − # minima.
+Combining all these equations leads to
+# maxima  # bounded regions of the flow complex.
+To establish equality in the last inequality it remains to show that every bounded region of the flow complex contains a maximum. Let x be an interior point of such a bounded region K . The point x cannot flow to infinity, because to do so its flow has to hit the flow complex which means that it belongs to this complex and flows into a saddle. We know from Lemma 8 that every non-critical point that does not flow to infinity is contained in the stable manifold of either a saddle or a maximum. We know that x cannot flow into a saddle, because otherwise it would be contained in the flow complex. Thus x must flow into a maximum in the interior of K . Hence every bounded region of the flow complex contains at least one maximum.
+We conclude that the closures of the bounded regions of the flow complex are exactly the smoothed stable manifolds of the maxima of φ.
+In particular, this theorem states that the boundary of the smoothed stable manifold of a maximum is made up from smoothed stable manifolds of index 2 saddle points. That is, the smoothed stable manifolds of critical points of different index have a nice recursive structure.
+188 J. Giesen, M. John / Computational Geometry 39 (2008) 178–190
+5. Algorithm
+The proof of Theorem 7 leads immediately to an efficient algorithm that computes the flow complex of a finite set P of points in R
+3. In the following pseudo code we show how to compute the triangles of the flow complex which is the most complicated part in the computation of this complex. The purpose of this pseudo code is also to present the construction in the proof of Theorem 7 in a more formal and compact way.
+STABLEFLOWCOMPLEX(P ) 1 F := ∅2 compute Voronoi- and Delaunay diagram of P . 3 compute the set S of index 2 saddles. 4 for each s ∈S do 5 f := Delaunay facet that contains s. 6 Q := ∅7 for each Delaunay edge e incident to f do 8 Q.push( (s, e) ) 9 end for
+10 while Q = ∅11 (v, e) := Q.pop 12 u,w := endpoints of e. 13 if e contains a saddle of index 1 do 14 F := F ∪{uvw} 15 else do 16 f := Voronoi facet dual to e. 17 d := driver of the interior of f . 18 v′ := first point on the ray from d to v
+that is contained in f . 19 F := F ∪{vv′u,vv′w} 20 f ′ := Delaunay facet dual to the
+Voronoi edge that contains v′. 21 for each edge e′ = e incident to f ′ do 22 Q.push( (v′, e′) ) 23 end for 24 end if 25 end while 26 end for 27 return F
+5.1. Surface reconstruction
+We have implemented the algorithm FLOWCOMPLEX and adapted it using the heuristic described in [10] for use in surface reconstruction. Surface reconstruction is a modeling paradigm: to create a model of some solid in R
+3 one samples its surface and applies a surface reconstruction algorithm to the sample. The most common model produced in surface reconstruction is a piecewise linear manifold. In [10] and in [5] we show how to extract a two-dimensional manifold from the flow complex. The method in [5] even comes with theoretical guarantees.The manifold extraction turns out to be much simpler as for Delaunay based methods and works well in practice, see the HAPPY BUDDHA
+and HIP examples in Fig. 7. Another application of the flow complex is the identification of pockets in macro-molecules. We discuss this appli-
+cation together with the extension of the flow complex to weighted points in [12]. In the latter application we consider the atoms of the molecule as points weighted with their van der Waals radius. The computation of the stable manifolds of index 2 critical points gets more involved in the weighted case.
+https://lh3.googleusercontent.com/notebooklm/AG60hOrsoS__pIU9FgJ-26PCdZb28memFMD0s2f0EUphOrFgcnB3tLE_7KV50-zp-1rHFMM8v-ewwCwBgybxhvY8Y5--ieIS9GEsLunNBLAniqFB1ZlPl6Ys-8tlUuKu5-h9GH6rKKlpYA=w756-h931-v0
+J. Giesen, M. John / Computational Geometry 39 (2008) 178–190 189
+Fig. 7. This example shows the reconstruction of the HAPPY BUDDHA (from the Stanford 3D scanning repository) and the HIP data set. The flow complex is shown on the left and the manifold reconstruction on the right. Observe that the flow complex approximates the shapes already quite well and is geometrically quite different from the convex hull of the sample points.
+6. Conclusion and future work
+We have introduced a new family of simplicial complexes called flow complex. It turned out to be well suited for surface reconstruction.
+Currently we neither know the combinatorial nor the algorithmic complexity of the flow complex. We know that for weighted points in two dimensions the complexity of the flow diagram is larger than that of the Delaunay triangulation, namely (n2), see [9].
+References
+[1] N. Amenta, M. Bern, Surface reconstruction by Voronoi filtering, Discrete Comput. Geom. 22 (1999) 481–504. [2] N. Amenta, S. Choi, T.K. Dey, N. Leekha, A simple algorithm for homeomorphic surface reconstruction, in: Proc. 16th ACM Sympos.
+Computational Geometry, 2000, pp. 213–222. [3] T.K. Dey, S. Goswami, Tight cocone: a water-tight surface reconstructor, in: Proc. 8th ACM Sympos. Solid Modeling and Applications, 2003,
+pp. 127–134. [4] T.K. Dey, S. Goswami, Provable surface reconstruction from noisy samples, in: Proc. 20th ACM Sympos. Computational Geometry, 2004,
+pp. 330–339. [5] T.K. Dey, J. Giesen, E. Ramos, B. Sadri, Critical points of the distance to an epsilon-sampling on a surface and flow based surface reconstruc-
+tion, in: Proc. 21st ACM Sympos. Computational Geometry, 2005, pp. 218–227. [6] H. Edelsbrunner, Surface reconstruction by wrapping finite point sets in space, Discrete Comput. Geom. 32 (2004) 231–244. [7] H. Edelsbrunner, M.A. Facello, J. Liang, On the definition and the construction of pockets in macromolecules, Discrete Appl. Math. 88 (1998)
+83–102.
+190 J. Giesen, M. John / Computational Geometry 39 (2008) 178–190
+[8] H. Edelsbrunner, Geometry and Topology for Mesh Generation, Cambridge Monographs on Applied and Computational Mathematics, Cam-bridge University Press, 2001.
+[9] J. Giesen, M. John, The complexity of flow diagrams in the plane, in: Proc. 14th Canadian Conference on Computational Geometry, 2002, pp. 45–48.
+[10] J. Giesen, M. John, Surface reconstruction based on a dynamical system, Computer Graphics Forum 21 (2002) 363–371. [11] J. Giesen, M. John, The flow complex: A data structure for geometric modeling, in: Proc. 14th ACM–SIAM Sympos. Discrete Algorithms,
+2003, pp. 285–294. [12] J. Giesen, M. John, Computing the weighted flow complex, in: Proc. 8th International Fall Workshop Vision, Modeling, and Visualization
+(VMV), 2003, pp. 235–243. [13] K. Grove, Critical point theory for distance functions, Proc. Sympos. Pure Math. 54 (3) (1993) 357–385. [14] J.R. Munkres, Elements of Algebraic Topology, Perseus Book Publishing, L.L.C., 1984. [15] D. Siersma, Voronoi diagrams and Morse theory of the distance function, in: O.E. Barndorff-Nielsen, E.B.V. Jensen (Eds.), Geometry in
+Present Day Science, World Scientific, 1999, pp. 187–208.
