@@ -75,6 +75,7 @@ struct FaceHash {
 struct Voronoi_vertex {
     bool is_infinite;
     Point point;
+    Vector infinite_direction;
 
     bool operator==(const Voronoi_vertex & other) const {
         return (is_infinite == other.is_infinite && point == other.point);

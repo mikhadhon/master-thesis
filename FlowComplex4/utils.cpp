@@ -15,7 +15,7 @@ Eigen::MatrixXd cliffordgen(int nsamples) {
     const double radius = 1 / sqrt(2);
 
     std::uniform_real_distribution<> angle_t{ 0, 2 * M_PI }, angle_p{ 0, 2 * M_PI };
-    std::uniform_real_distribution<> noise{ -0.07, 0.07};
+    std::uniform_real_distribution<> noise{ -0.0001, 0.0001};
 
     Eigen::MatrixXd samples(nsamples, 4);
 
@@ -24,7 +24,7 @@ Eigen::MatrixXd cliffordgen(int nsamples) {
         double q = angle_p(gen);
 
         double a = 1;
-        double b = 1/* + noise(gen)*/;
+        double b = 1 + noise(gen);
 
         auto sample = Eigen::Vector4d(a * cos(p), a * sin(p), b * cos(q), b * sin(q));
         sample *= radius;

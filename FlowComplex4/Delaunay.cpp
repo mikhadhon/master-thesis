@@ -141,7 +141,7 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
 
         if (!is_infinite_cell[i]) {
             Point cell_circumcenter = circumcenter()(boost::make_transform_iterator(ordered_incident_cells[i]->vertices_begin(), Vertex_to_point()), boost::make_transform_iterator(ordered_incident_cells[i]->vertices_end(), Vertex_to_point()));
-            voronoi_vertex = Voronoi_vertex{false, cell_circumcenter};
+            voronoi_vertex = Voronoi_vertex{false, cell_circumcenter, Vector()};
         } else {
             Delaunay::Full_cell_handle finite_neighbor = is_infinite_cell[(i + 1) % is_infinite_cell.size()] ? ordered_incident_cells[(i - 1) % is_infinite_cell.size()] : ordered_incident_cells[(i + 1) % is_infinite_cell.size()];
             Point finite_circumcenter = circumcenter()(boost::make_transform_iterator(finite_neighbor->vertices_begin(), Vertex_to_point()), boost::make_transform_iterator(finite_neighbor->vertices_end(), Vertex_to_point()));
@@ -149,30 +149,56 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
             std::vector<Point> shared_tetrahedron_points;
             get_shared_delaunay_tetrahedron(ordered_incident_cells[i], finite_neighbor, shared_tetrahedron_points);
 
-            std::vector<Eigen::VectorXd> tetrahedron_points_eigen;
-            for (const auto& p : shared_tetrahedron_points) {
-                tetrahedron_points_eigen.push_back(make_point_eigen(p));
+            // Compute exact tetrahedron normal via cofactor expansion of the 3x4 edge matrix
+            Point p0 = shared_tetrahedron_points[0];
+            FT v1[4], v2[4], v3[4];
+            for (int k = 0; k < 4; ++k) {
+                v1[k] = shared_tetrahedron_points[1][k] - p0[k];
+                v2[k] = shared_tetrahedron_points[2][k] - p0[k];
+                v3[k] = shared_tetrahedron_points[3][k] - p0[k];
             }
 
-            Eigen::VectorXd normal;
-            get_tetrahedron_normal(tetrahedron_points_eigen, normal);
+            // 4D generalized cross product: n[k] = (-1)^k * det of 3x3 minor deleting column k
+            auto det3 = [](FT a00, FT a01, FT a02,
+                           FT a10, FT a11, FT a12,
+                           FT a20, FT a21, FT a22) -> FT {
+                return a00 * (a11 * a22 - a12 * a21)
+                     - a01 * (a10 * a22 - a12 * a20)
+                     + a02 * (a10 * a21 - a11 * a20);
+            };
 
-            Eigen::VectorXd opposite_vertex;
+            FT n0 =  det3(v1[1],v1[2],v1[3], v2[1],v2[2],v2[3], v3[1],v3[2],v3[3]);
+            FT n1 = -det3(v1[0],v1[2],v1[3], v2[0],v2[2],v2[3], v3[0],v3[2],v3[3]);
+            FT n2 =  det3(v1[0],v1[1],v1[3], v2[0],v2[1],v2[3], v3[0],v3[1],v3[3]);
+            FT n3 = -det3(v1[0],v1[1],v1[2], v2[0],v2[1],v2[2], v3[0],v3[1],v3[2]);
+
+            // Orient normal to point away from the opposite vertex in the finite neighbor
+            Point opposite_point;
             for (auto v = finite_neighbor->vertices_begin(); v != finite_neighbor->vertices_end(); ++v) {
                 if (!dt.is_infinite(*v) && !ordered_incident_cells[i]->has_vertex(*v)) {
-                    opposite_vertex = make_point_eigen((*v)->point());
+                    opposite_point = (*v)->point();
                     break;
                 }
             }
-
-            Eigen::VectorXd to_opposite = opposite_vertex - tetrahedron_points_eigen[0];
-            if (normal.dot(to_opposite) > 0) {
-                normal = -normal;
+            FT to_opp_dot = n0 * (opposite_point[0] - p0[0])
+                          + n1 * (opposite_point[1] - p0[1])
+                          + n2 * (opposite_point[2] - p0[2])
+                          + n3 * (opposite_point[3] - p0[3]);
+            if (to_opp_dot > FT(0)) {
+                n0 = -n0; n1 = -n1; n2 = -n2; n3 = -n3;
             }
 
-            Eigen::VectorXd infinite_direction = 9999999999999 * normal;
-            Point infinite_point = Vector(finite_circumcenter) + Point(infinite_direction[0], infinite_direction[1], infinite_direction[2], infinite_direction[3]);
-            voronoi_vertex = Voronoi_vertex{true, infinite_point};
+            Vector exact_direction(n0, n1, n2, n3);
+
+            // Keep approximate point for Polyscope visualization
+            double nd0 = CGAL::to_double(n0), nd1 = CGAL::to_double(n1),
+                   nd2 = CGAL::to_double(n2), nd3 = CGAL::to_double(n3);
+            double len = std::sqrt(nd0*nd0 + nd1*nd1 + nd2*nd2 + nd3*nd3);
+            if (len > 0) { nd0 /= len; nd1 /= len; nd2 /= len; nd3 /= len; }
+            double scale = 9999999999999.0;
+            Point infinite_point = Vector(finite_circumcenter) + Point(nd0*scale, nd1*scale, nd2*scale, nd3*scale);
+
+            voronoi_vertex = Voronoi_vertex{true, infinite_point, exact_direction};
             infinite_vertices.push_back(infinite_point);
         }
 

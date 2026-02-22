@@ -13,7 +13,7 @@ int main() {
     int dim = 4;
 
     Eigen::MatrixXd V;
-    V = cliffordgen(500);
+    V = cliffordgen(10000);
 
     std::vector<Point> points;
     for (int i = 0; i < V.rows(); i++) {

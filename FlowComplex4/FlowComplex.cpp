@@ -12,23 +12,30 @@ bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out) {
     Point pj = df.face.vertex(1)->point();
     Point pl = df.face.vertex(2)->point();
 
-    if (vp.voronoi_vertices.size() < 3) {
-        return false;
-    }
-
     const int nv = static_cast<int>(vp.voronoi_vertices.size());
 
+    // Find three finite basis vertices for the polygon plane
+    int b0 = -1, b1 = -1, b2 = -1;
+    for (int i = 0; i < nv; ++i) {
+        if (!vp.voronoi_vertices[i].is_infinite) {
+            if (b0 == -1) b0 = i;
+            else if (b1 == -1) b1 = i;
+            else if (b2 == -1) { b2 = i; break; }
+        }
+    }
+    if (b2 == -1) return false;
+
     // Build 4x4 system in exact FT:
-    // [e1 | e2 | -f1 | -f2] * [s; t; u; w] = V[0] - pi
-    // e1 = pj - pi, e2 = pl - pi (exact from CGAL)
-    // f1 = V[1] - V[0], f2 = V[2] - V[0] (FT-wrapped doubles)
+    // [e1 | e2 | -f1 | -f2] * [s; t; u; w] = V[b0] - pi
+    // e1 = pj - pi, e2 = pl - pi
+    // f1 = V[b1] - V[b0], f2 = V[b2] - V[b0]
     FT m[4][5]; // augmented matrix [M | rhs]
     for (int k = 0; k < 4; ++k) {
         m[k][0] = pj[k] - pi[k];
         m[k][1] = pl[k] - pi[k];
-        m[k][2] = -(FT(vp.voronoi_vertices[1].point[k]) - FT(vp.voronoi_vertices[0].point[k]));
-        m[k][3] = -(FT(vp.voronoi_vertices[2].point[k]) - FT(vp.voronoi_vertices[0].point[k]));
-        m[k][4] = FT(vp.voronoi_vertices[0].point[k]) - pi[k];
+        m[k][2] = -(vp.voronoi_vertices[b1].point[k] - vp.voronoi_vertices[b0].point[k]);
+        m[k][3] = -(vp.voronoi_vertices[b2].point[k] - vp.voronoi_vertices[b0].point[k]);
+        m[k][4] = vp.voronoi_vertices[b0].point[k] - pi[k];
     }
 
     // Gaussian elimination
@@ -60,17 +67,17 @@ bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out) {
 
     FT s = sol[0], t = sol[1], u = sol[2], w = sol[3];
 
-    // Triangle: strictly inside iff s > 0, t > 0, s + t < 1
-    if (!(s >= FT(0) && t >= FT(0) && s + t <= FT(1))) {
+    // Triangle containment: s >= 0, t >= 0, s + t <= 1
+    if (!(s > FT(0) && t > FT(0) && s + t < FT(1))) {
         return false;
     }
 
     // Voronoi polygon containment in exact FT
-    // Project each polygon vertex to (f1, f2) frame using a 2x2 subsystem
+    // Basis vectors from finite vertices
     FT fv1[4], fv2[4];
     for (int k = 0; k < 4; ++k) {
-        fv1[k] = FT(vp.voronoi_vertices[1].point[k]) - FT(vp.voronoi_vertices[0].point[k]);
-        fv2[k] = FT(vp.voronoi_vertices[2].point[k]) - FT(vp.voronoi_vertices[0].point[k]);
+        fv1[k] = vp.voronoi_vertices[b1].point[k] - vp.voronoi_vertices[b0].point[k];
+        fv2[k] = vp.voronoi_vertices[b2].point[k] - vp.voronoi_vertices[b0].point[k];
     }
 
     // Find two rows where [f1|f2] has a non-zero 2x2 determinant
@@ -85,37 +92,54 @@ bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out) {
 
     FT det_f = fv1[r1] * fv2[r2] - fv1[r2] * fv2[r1];
 
-    // Project polygon vertices to 2D (u_k, w_k) coordinates
+    // Project finite polygon vertices to 2D (u_k, w_k) coordinates
     std::vector<std::pair<FT, FT>> P(nv);
     for (int i = 0; i < nv; ++i) {
-        FT dv_r1 = FT(vp.voronoi_vertices[i].point[r1]) - FT(vp.voronoi_vertices[0].point[r1]);
-        FT dv_r2 = FT(vp.voronoi_vertices[i].point[r2]) - FT(vp.voronoi_vertices[0].point[r2]);
+        if (vp.voronoi_vertices[i].is_infinite) continue;
+        FT dv_r1 = vp.voronoi_vertices[i].point[r1] - vp.voronoi_vertices[b0].point[r1];
+        FT dv_r2 = vp.voronoi_vertices[i].point[r2] - vp.voronoi_vertices[b0].point[r2];
         P[i] = { (dv_r1 * fv2[r2] - dv_r2 * fv2[r1]) / det_f,
                   (fv1[r1] * dv_r2 - fv1[r2] * dv_r1) / det_f };
     }
 
-    // Signed area to determine winding
-    FT area2(0);
-    for (int i = 0; i < nv; ++i) {
-        int j = (i + 1) % nv;
-        area2 += P[i].first * P[j].second - P[j].first * P[i].second;
-    }
-    if (area2 == FT(0)) {
-        return false;
-    }
+    // Helper: project a 4D direction vector to 2D
+    auto project_dir = [&](const Vector &dir) -> std::pair<FT, FT> {
+        FT d_r1 = dir[r1];
+        FT d_r2 = dir[r2];
+        return { (d_r1 * fv2[r2] - d_r2 * fv2[r1]) / det_f,
+                 (fv1[r1] * d_r2 - fv1[r2] * d_r1) / det_f };
+    };
 
-    // Check that (u, w) is strictly inside every edge
+    // Winding is always CCW with basis (b0,b1,b2) → P[b0]=(0,0), P[b1]=(1,0), P[b2]=(0,1)
+    // Check that (u, w) is inside every edge
     for (int i = 0; i < nv; ++i) {
         int j = (i + 1) % nv;
-        FT ex = P[j].first  - P[i].first;
-        FT ey = P[j].second - P[i].second;
-        FT wx = u - P[i].first;
-        FT wy = w - P[i].second;
-        FT cross = ex * wy - ey * wx;
-        if (area2 > FT(0) ? cross <= FT(0) : cross >= FT(0)) {
+        bool inf_i = vp.voronoi_vertices[i].is_infinite;
+        bool inf_j = vp.voronoi_vertices[j].is_infinite;
+
+        if (inf_i && inf_j) continue;
+
+        FT cross;
+        if (!inf_i && !inf_j) {
+            // Both finite: standard cross product
+            FT ex = P[j].first  - P[i].first;
+            FT ey = P[j].second - P[i].second;
+            cross = ex * (w - P[i].second) - ey * (u - P[i].first);
+        } else if (!inf_i && inf_j) {
+            // Finite → infinite: edge direction is the infinite direction of V_j
+            auto [dx, dy] = project_dir(vp.voronoi_vertices[j].infinite_direction);
+            cross = dx * (w - P[i].second) - dy * (u - P[i].first);
+        } else {
+            // Infinite → finite: edge direction is -d_i (from infinity toward V_j)
+            auto [dx, dy] = project_dir(vp.voronoi_vertices[i].infinite_direction);
+            cross = (-dx) * (w - P[j].second) - (-dy) * (u - P[j].first);
+        }
+
+        if (cross < FT(0)) {
             return false;
         }
     }
+
     Vector pjpi = (Vector(pj) - pi);
     Vector spjpi = Vector(s * pjpi[0], s * pjpi[1], s * pjpi[2], s * pjpi[3]);
     Vector plpi = (Vector(pl) - pi);
@@ -125,25 +149,32 @@ bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out) {
 }
 
 bool intersect_ray_vp(const Point &origin, const Point &through, Voronoi_face &vp, Point &out) {
-    if (vp.voronoi_vertices.size() < 3) {
-        return false;
-    }
+    const int nv = static_cast<int>(vp.voronoi_vertices.size());
 
-    int nv = (int)vp.voronoi_vertices.size();
+    // Find three finite basis vertices for the polygon plane
+    int b0 = -1, b1 = -1, b2 = -1;
+    for (int i = 0; i < nv; ++i) {
+        if (!vp.voronoi_vertices[i].is_infinite) {
+            if (b0 == -1) b0 = i;
+            else if (b1 == -1) b1 = i;
+            else if (b2 == -1) { b2 = i; break; }
+        }
+    }
+    if (b2 == -1) return false;
 
     // Ray: origin + λ * (through - origin), λ ≥ 0
-    // Voronoi plane: V[0] + u * f1 + w * f2
-    // where f1 = V[1] - V[0], f2 = V[2] - V[0]
+    // Voronoi plane: V[b0] + u * f1 + w * f2
+    // where f1 = V[b1] - V[b0], f2 = V[b2] - V[b0]
     //
-    // Intersection: λ*d - u*f1 - w*f2 = V[0] - origin
+    // Intersection: λ*d - u*f1 - w*f2 = V[b0] - origin
     // where d = through - origin
     // This is 4 equations (one per dimension), 3 unknowns (λ, u, w)
     FT m[4][4]; // augmented matrix [M | rhs]
     for (int k = 0; k < 4; ++k) {
         m[k][0] = through[k] - origin[k];
-        m[k][1] = -vp.voronoi_vertices[1].point[k] - vp.voronoi_vertices[0].point[k];
-        m[k][2] = -vp.voronoi_vertices[2].point[k] - vp.voronoi_vertices[0].point[k];
-        m[k][3] = vp.voronoi_vertices[0].point[k] - origin[k];
+        m[k][1] = -(vp.voronoi_vertices[b1].point[k] - vp.voronoi_vertices[b0].point[k]);
+        m[k][2] = -(vp.voronoi_vertices[b2].point[k] - vp.voronoi_vertices[b0].point[k]);
+        m[k][3] = vp.voronoi_vertices[b0].point[k] - origin[k];
     }
 
     // Gaussian elimination on 4x3 coefficient part (3 pivot columns, 4 rows)
@@ -166,8 +197,7 @@ bool intersect_ray_vp(const Point &origin, const Point &through, Voronoi_face &v
 
     // After elimination, row 3 has columns 0-2 zeroed.
     // For the system to be consistent, the rhs must also be zero.
-    double eps = 1e-12;
-    if (m[3][3] < FT(-eps) || m[3][3] > eps) {
+    if (m[3][3] != FT(0)) {
         return false;
     }
 
@@ -187,11 +217,12 @@ bool intersect_ray_vp(const Point &origin, const Point &through, Voronoi_face &v
         return false;
     }
 
-    // Voronoi polygon containment in exact FT (same approach as intersect_df_vp)
+    // Voronoi polygon containment in exact FT
+    // Basis vectors from finite vertices
     FT fv1[4], fv2[4];
     for (int k = 0; k < 4; ++k) {
-        fv1[k] = vp.voronoi_vertices[1].point[k] - vp.voronoi_vertices[0].point[k];
-        fv2[k] = vp.voronoi_vertices[2].point[k] - vp.voronoi_vertices[0].point[k];
+        fv1[k] = vp.voronoi_vertices[b1].point[k] - vp.voronoi_vertices[b0].point[k];
+        fv2[k] = vp.voronoi_vertices[b2].point[k] - vp.voronoi_vertices[b0].point[k];
     }
 
     // Find two rows where [f1|f2] has a non-zero 2x2 determinant
@@ -206,42 +237,57 @@ bool intersect_ray_vp(const Point &origin, const Point &through, Voronoi_face &v
 
     FT det_f = fv1[r1] * fv2[r2] - fv1[r2] * fv2[r1];
 
-    // Project polygon vertices to 2D (u_k, w_k) coordinates
+    // Project finite polygon vertices to 2D (u_k, w_k) coordinates
     std::vector<std::pair<FT, FT>> P(nv);
     for (int i = 0; i < nv; ++i) {
-        FT dv_r1 = vp.voronoi_vertices[i].point[r1] - vp.voronoi_vertices[0].point[r1];
-        FT dv_r2 = vp.voronoi_vertices[i].point[r2] - vp.voronoi_vertices[0].point[r2];
+        if (vp.voronoi_vertices[i].is_infinite) continue;
+        FT dv_r1 = vp.voronoi_vertices[i].point[r1] - vp.voronoi_vertices[b0].point[r1];
+        FT dv_r2 = vp.voronoi_vertices[i].point[r2] - vp.voronoi_vertices[b0].point[r2];
         P[i] = { (dv_r1 * fv2[r2] - dv_r2 * fv2[r1]) / det_f,
                   (fv1[r1] * dv_r2 - fv1[r2] * dv_r1) / det_f };
     }
 
-    // Signed area to determine winding
-    FT area2(0);
-    for (int i = 0; i < nv; ++i) {
-        int j = (i + 1) % nv;
-        area2 += P[i].first * P[j].second - P[j].first * P[i].second;
-    }
-    if (area2 == FT(0)) {
-        return false;
-    }
+    // Helper: project a 4D direction vector to 2D
+    auto project_dir = [&](const Vector &dir) -> std::pair<FT, FT> {
+        FT d_r1 = dir[r1];
+        FT d_r2 = dir[r2];
+        return { (d_r1 * fv2[r2] - d_r2 * fv2[r1]) / det_f,
+                 (fv1[r1] * d_r2 - fv1[r2] * d_r1) / det_f };
+    };
 
-    // Check that (u, w) is strictly inside every edge
+    // Winding is always CCW with basis (b0,b1,b2) → P[b0]=(0,0), P[b1]=(1,0), P[b2]=(0,1)
+    // Check that (u, w) is inside every edge
     for (int i = 0; i < nv; ++i) {
         int j = (i + 1) % nv;
-        if (vp.voronoi_vertices[i].is_infinite && vp.voronoi_vertices[j].is_infinite) continue;
-        FT ex = P[j].first  - P[i].first;
-        FT ey = P[j].second - P[i].second;
-        FT wx = u - P[i].first;
-        FT wy = w - P[i].second;
-        FT cross = ex * wy - ey * wx;
-        if (area2 > FT(0) ? cross <= FT(0) : cross >= FT(0)) {
+        bool inf_i = vp.voronoi_vertices[i].is_infinite;
+        bool inf_j = vp.voronoi_vertices[j].is_infinite;
+
+        if (inf_i && inf_j) continue;
+
+        FT cross;
+        if (!inf_i && !inf_j) {
+            // Both finite: standard cross product
+            FT ex = P[j].first  - P[i].first;
+            FT ey = P[j].second - P[i].second;
+            cross = ex * (w - P[i].second) - ey * (u - P[i].first);
+        } else if (!inf_i && inf_j) {
+            // Finite → infinite: edge direction is the infinite direction of V_j
+            auto [dx, dy] = project_dir(vp.voronoi_vertices[j].infinite_direction);
+            cross = dx * (w - P[i].second) - dy * (u - P[i].first);
+        } else {
+            // Infinite → finite: edge direction is -d_i (from infinity toward V_j)
+            auto [dx, dy] = project_dir(vp.voronoi_vertices[i].infinite_direction);
+            cross = (-dx) * (w - P[j].second) - (-dy) * (u - P[j].first);
+        }
+
+        if (cross <= FT(0)) {
             return false;
         }
     }
-    Vector pjpi = (Vector(through) - origin);
-    Vector spjpi = Vector(lambda * pjpi[0], lambda * pjpi[1], lambda * pjpi[2], lambda * pjpi[3]);
 
-    out = origin + spjpi;
+    Vector d = (Vector(through) - origin);
+    Vector ld = Vector(lambda * d[0], lambda * d[1], lambda * d[2], lambda * d[3]);
+    out = origin + ld;
     return true;
 }
 
@@ -252,6 +298,7 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
     std::vector<std::array<size_t, 3>> non_gabriel_faces;
     std::vector<std::array<size_t, 2>> gabriel_edges;
     std::vector<Eigen::VectorXd> V_projected = stereo_projection(vertices);
+    int missed_intersections = 0;
 
     for (auto delaunay_faces = get_delaunay_faces(delaunay); const auto & delaunay_face : delaunay_faces) {
         if (!delaunay.is_infinite(delaunay_face.face)) {
@@ -315,7 +362,7 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                         //     }
                         // }
                         if (!intersected) {
-                            std::cout << "no intersecetion" << std::endl;
+                            missed_intersections++;
                         }
 
                         if (next_face.has_value() && s_prime.has_value()) {
@@ -356,4 +403,5 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
     }
     polyscope::registerCurveNetwork("Gabriel edges", V_projected, gabriel_edges);
     //polyscope::registerSurfaceMesh("non-gabriel", vertices, non_gabriel_faces);
+    std::cout << "Missed intersections: " << missed_intersections << std::endl;
 }
