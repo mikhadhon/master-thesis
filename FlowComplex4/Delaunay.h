@@ -4,6 +4,7 @@
 #include <CGAL/Epeck_d.h>
 #include <CGAL/Delaunay_triangulation.h>
 #include <boost/functional/hash.hpp>
+#include <CGAL/Linear_algebraCd.h>
 
 typedef CGAL::Dimension_tag<4> Dimension;
 typedef CGAL::Epeck_d<Dimension> K;
@@ -18,6 +19,13 @@ typedef K::Squared_distance_d squared_distance;
 typedef K::Contained_in_simplex_d contained_in_simplex;
 typedef K::Scalar_product_d dot;
 typedef K::Equal_d equal;
+typedef CGAL::Linear_algebraCd<FT> LA;
+typedef LA::Matrix LA_Matrix;
+typedef LA::Vector LA_Vector;
+typedef K::Contained_in_simplex_d contained_in_simplex;
+typedef K::Orientation_d orientation;
+typedef K::Contained_in_affine_hull_d contained_in_affine_hull;
+typedef K::Contained_in_linear_hull_d contained_in_linear_hull;
 
 struct Edge {
     Delaunay::Vertex_handle vertex1;
@@ -130,5 +138,7 @@ void get_facet_vertices(
 void get_tetrahedron_normal(const std::vector<Eigen::VectorXd> &tetrahedron_points, Eigen::VectorXd &normal);
 
 std::unordered_set<Face, FaceHash> get_delaunay_faces(Delaunay &dt);
+
+std::unordered_set<Face, FaceHash> get_incident_faces_to_edge(const Edge &edge, const Delaunay &dt);
 
 #endif

@@ -64,7 +64,7 @@ std::unordered_set<Face, FaceHash> get_incident_faces_to_edge(const Edge &edge, 
             auto current_vertex = cell->vertex(i);
             if (current_vertex != edge.vertex1 && current_vertex != edge.vertex2) {
                 std::vector face_vertices = {current_vertex, edge.vertex1, edge.vertex2};
-                std::ranges::sort(face_vertices);
+                std::sort(face_vertices.begin(), face_vertices.end());
                 Delaunay::Face dt_face(cell);
                 for (int l = 0; l < 3; ++l){
                     dt_face.set_index(l, cell->index(face_vertices[l]));
@@ -142,7 +142,8 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
         if (!is_infinite_cell[i]) {
             Point cell_circumcenter = circumcenter()(boost::make_transform_iterator(ordered_incident_cells[i]->vertices_begin(), Vertex_to_point()), boost::make_transform_iterator(ordered_incident_cells[i]->vertices_end(), Vertex_to_point()));
             voronoi_vertex = Voronoi_vertex{false, cell_circumcenter, Vector()};
-        } else {
+        }
+        else {
             Delaunay::Full_cell_handle finite_neighbor = is_infinite_cell[(i + 1) % is_infinite_cell.size()] ? ordered_incident_cells[(i - 1) % is_infinite_cell.size()] : ordered_incident_cells[(i + 1) % is_infinite_cell.size()];
             Point finite_circumcenter = circumcenter()(boost::make_transform_iterator(finite_neighbor->vertices_begin(), Vertex_to_point()), boost::make_transform_iterator(finite_neighbor->vertices_end(), Vertex_to_point()));
 
@@ -195,7 +196,7 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
                    nd2 = CGAL::to_double(n2), nd3 = CGAL::to_double(n3);
             double len = std::sqrt(nd0*nd0 + nd1*nd1 + nd2*nd2 + nd3*nd3);
             if (len > 0) { nd0 /= len; nd1 /= len; nd2 /= len; nd3 /= len; }
-            double scale = 9999999999999.0;
+            double scale = 2.0;
             Point infinite_point = Vector(finite_circumcenter) + Point(nd0*scale, nd1*scale, nd2*scale, nd3*scale);
 
             voronoi_vertex = Voronoi_vertex{true, infinite_point, exact_direction};
@@ -205,20 +206,20 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
         voronoi_vertices.push_back(voronoi_vertex);
         ps_vertices.push_back(make_point_eigen(voronoi_vertex.point));
     }
-    //
-    // for (size_t i = 0; i < ordered_incident_cells.size(); ++i) {
-    //     size_t next_i = (i + 1) % ordered_incident_cells.size();
-    //
-    //     if (!(is_infinite_tet[i] && is_infinite_tet[next_i])) {
-    //         voronoi_edges.push_back(Voronoi_edge(
-    //            voronoi_vertices[i],
-    //            voronoi_vertices[next_i],
-    //            ordered_incident_cells[i],
-    //            ordered_incident_cells[next_i]
-    //        ));
-    //         ps_edges.push_back({i, next_i});
-    //     }
-    // }
+
+    for (size_t i = 0; i < ordered_incident_cells.size(); ++i) {
+        size_t next_i = (i + 1) % ordered_incident_cells.size();
+
+        if (!(is_infinite_cell[i] && is_infinite_cell[next_i])) {
+            voronoi_edges.push_back(Voronoi_edge(
+               voronoi_vertices[i],
+               voronoi_vertices[next_i],
+               ordered_incident_cells[i],
+               ordered_incident_cells[next_i]
+           ));
+            ps_edges.push_back({i, next_i});
+        }
+    }
     //polyscope::registerPointCloud("infinite voronoi vertices", infinite_vertices);
     return Voronoi_face{voronoi_vertices, voronoi_edges, ps_vertices, ps_edges, face};
 }
@@ -252,8 +253,180 @@ void insert_points(const std::vector<Point> &points, Delaunay &delaunay) {
     }
 }
 
+bool intersect_df_vp_d(const Face &df, Voronoi_face &vp, Point &out) {
+    Point pi = df.face.vertex(0)->point();
+    Point pj = df.face.vertex(1)->point();
+    Point pl = df.face.vertex(2)->point();
+
+    const int nv = static_cast<int>(vp.voronoi_vertices.size());
+    //
+    // // Find three finite basis vertices for the polygon plane
+    int b0 = -1, b1 = -1, b2 = -1;
+    for (int i = 0; i < nv; ++i) {
+        if (b0 == -1) b0 = i;
+        else if (b1 == -1) b1 = i;
+        else if (b2 == -1) { b2 = i; break; }
+    }
+    if (b2 == -1) return false;
+
+    // Build 4x4 system in exact FT:
+    // [e1 | e2 | -f1 | -f2] * [s; t; u; w] = V[b0] - pi
+    // e1 = pj - pi, e2 = pl - pi
+    // f1 = V[b1] - V[b0], f2 = V[b2] - V[b0]
+    FT m[4][5]; // augmented matrix [M | rhs]
+    for (int k = 0; k < 4; ++k) {
+        m[k][0] = pj[k] - pi[k];
+        m[k][1] = pl[k] - pi[k];
+        m[k][2] = -(vp.voronoi_vertices[b1].point[k] - vp.voronoi_vertices[b0].point[k]);
+        m[k][3] = -(vp.voronoi_vertices[b2].point[k] - vp.voronoi_vertices[b0].point[k]);
+        m[k][4] = vp.voronoi_vertices[b0].point[k] - pi[k];
+    }
+
+    // Gaussian elimination
+    for (int col = 0; col < 4; ++col) {
+        int pivot = -1;
+        for (int row = col; row < 4; ++row) {
+            if (m[row][col] != FT(0)) { pivot = row; break; }
+        }
+        if (pivot == -1) {
+            return false;
+        }
+        if (pivot != col)
+            for (int j = col; j < 5; ++j) std::swap(m[col][j], m[pivot][j]);
+        for (int row = col + 1; row < 4; ++row) {
+            FT factor = m[row][col] / m[col][col];
+            for (int j = col; j < 5; ++j)
+                m[row][j] -= factor * m[col][j];
+        }
+    }
+
+    // Back substitution
+    FT sol[4];
+    for (int i = 3; i >= 0; --i) {
+        sol[i] = m[i][4];
+        for (int j = i + 1; j < 4; ++j)
+            sol[i] -= m[i][j] * sol[j];
+        sol[i] /= m[i][i];
+    }
+
+    FT s = sol[0], t = sol[1], u = sol[2], w = sol[3];
+
+    // Triangle containment: s >= 0, t >= 0, s + t <= 1
+    if (!(s >= FT(0) && t >= FT(0) && s + t <= FT(1))) {
+        return false;
+    }
+
+    // std::vector df_vertices = {df.face.vertex(0)->point(), df.face.vertex(1)->point(), df.face.vertex(2)->point()};
+    // Point p_int = circumcenter()(df_vertices.begin(), df_vertices.end());
+
+    if (!(dot()(Vector(pj) - pi, Vector(pl) - pi) >= 0 && dot()(Vector(pi) - pj, Vector(pl) -pj ) >= 0 && dot()(Vector(pi) - pl, Vector(pj) - pl) >= 0)) {
+        return false;
+    };
+
+    // Voronoi polygon containment via SVD projection to 2D
+    // Basis vectors from finite vertices
+    Eigen::Matrix<double, 2, 4> A;
+    for (int k = 0; k < 4; ++k) {
+        A(0, k) = CGAL::to_double(vp.voronoi_vertices[b1].point[k] - vp.voronoi_vertices[b0].point[k]);
+        A(1, k) = CGAL::to_double(vp.voronoi_vertices[b2].point[k] - vp.voronoi_vertices[b0].point[k]);
+    }
+
+    Eigen::JacobiSVD<Eigen::Matrix<double, 2, 4>> svd(A, Eigen::ComputeFullV);
+    // Last two columns of V are the orthonormal basis plane's null space
+    Eigen::Matrix<double, 2, 4> VT = svd.matrixV().rightCols<2>().transpose();
+
+
+    Point n1(VT.row(0).begin(), VT.row(0).end());
+    Point n2(VT.row(1).begin(), VT.row(1).end());
+
+    Vector pjpi = (Vector(pj) - pi);
+    Vector spjpi = Vector(s * pjpi[0], s * pjpi[1], s * pjpi[2], s * pjpi[3]);
+    Vector plpi = (Vector(pl) - pi);
+    Vector tpjpi = Vector(t * plpi[0], t * plpi[1], t * plpi[2], t * plpi[3]);
+    Vector p_int = pi + spjpi + tpjpi;
+
+    // Debug: centroid of finite vertices is guaranteed inside the polygon
+    FT cx(0), cy(0), cz(0), cw(0);
+    int finite_count = 0;
+    for (int i = 0; i < nv; ++i) {
+        if (!vp.voronoi_vertices[i].is_infinite) {
+            cx += vp.voronoi_vertices[i].point[0];
+            cy += vp.voronoi_vertices[i].point[1];
+            cz += vp.voronoi_vertices[i].point[2];
+            cw += vp.voronoi_vertices[i].point[3];
+            finite_count++;
+        }
+    }
+    Point centroid(cx / finite_count, cy / finite_count, cz / finite_count, cw / finite_count);
+
+    // Check containment: all edge determinants must have the same sign
+    int sign = 0;
+    for (const auto &edge : vp.voronoi_edges) {
+        Point ref;
+        Vector vec;
+
+        if (!edge.vertex1.is_infinite && !edge.vertex2.is_infinite) {
+            ref = edge.vertex1.point;
+            vec = Vector(edge.vertex2.point) - edge.vertex1.point;
+        }
+        else if (!edge.vertex1.is_infinite && edge.vertex2.is_infinite) {
+            ref = edge.vertex1.point;
+            vec = edge.vertex2.infinite_direction;
+        }
+        else if (edge.vertex1.is_infinite && !edge.vertex2.is_infinite) {
+            ref = edge.vertex2.point;
+            vec = edge.vertex1.infinite_direction;
+        }
+        else continue;
+        // std::vector simplex_vertices  = {Point(p_int), ref, Point(Vector(ref) + vec), Point(Vector(ref) + pjpi), Point(Vector(ref) + plpi)};
+        //
+        // auto o = orientation()(simplex_vertices.begin(), simplex_vertices.end());
+
+        auto orientation_test = [&](const Point& p) {
+            std::vector<Point> simplex = {
+                p,
+                ref,
+                Point(Vector(ref) + vec),
+                Point(Vector(ref) + pi),
+                Point(Vector(ref) + pj)
+            };
+            return orientation()(simplex.begin(), simplex.end());
+        };
+
+        auto o_point = orientation_test(p_int);
+        auto o_centroid = orientation_test(centroid);
+        if (o_point == CGAL::ZERO) {
+            continue;
+        }
+
+        if (o_point != o_centroid && o_centroid != CGAL::ZERO) {
+            return false;
+        }
+        // int current_sign = (o == CGAL::POSITIVE) ? 1 : -1;
+        // if (sign == 0) sign = current_sign;
+        // else if (sign != current_sign) {
+        //     return false;
+        // }
+    }
+
+    // Vector pjpi = (Vector(pj) - pi);
+    // Vector spjpi = Vector(s * pjpi[0], s * pjpi[1], s * pjpi[2], s * pjpi[3]);
+    // Vector plpi = (Vector(pl) - pi);
+    // Vector tpjpi = Vector(t * plpi[0], t * plpi[1], t * plpi[2], t * plpi[3]);
+    out = p_int;
+    return true;
+}
+
+
 bool is_index_two_critical_point(const Face &face, const Delaunay &dt) {
     Voronoi_face f = delaunay_face_dual(face, dt);
+    // for (auto &edge : f.voronoi_edges) {
+    //     if (edge.vertex1.is_infinite || edge.vertex2.is_infinite) {
+    //         return false;
+    //     }
+    // }
+    Point out;
+    bool test2 = intersect_df_vp_d(face, f, out);
     std::vector face_vertices = {face.face.vertex(0)->point(), face.face.vertex(1)->point(), face.face.vertex(2)->point()};
     Point cc = circumcenter()(face_vertices.begin(), face_vertices.end());
     const FT sq_radius = squared_distance()(cc, face.face.vertex(0)->point());
@@ -283,121 +456,11 @@ bool is_index_two_critical_point(const Face &face, const Delaunay &dt) {
     Point pj = face.face.vertex(1)->point();
     Point pl = face.face.vertex(2)->point();
 
-    return test && dot()(Vector(pj) - pi, Vector(pl) - pi) >= 0 && dot()(Vector(pi) - pj, Vector(pl) -pj ) >= 0 && dot()(Vector(pi) - pl, Vector(pj) - pl) >= 0;
-
-    // return true;
-    // if (f.voronoi_vertices.size() < 3) {
-    //     if (test) std::cout << "1" << std::endl;
-    //     return false;
-    // }
-    //
-    // int nv = (int)f.voronoi_vertices.size();
-    //
-    // // Build 4x4 system in exact FT:
-    // // [e1 | e2 | -f1 | -f2] * [s; t; u; w] = V[0] - pi
-    // // e1 = pj - pi, e2 = pl - pi (exact from CGAL)
-    // // f1 = V[1] - V[0], f2 = V[2] - V[0] (FT-wrapped doubles)
-    // FT m[4][5]; // augmented matrix [M | rhs]
-    // for (int k = 0; k < 4; ++k) {
-    //     m[k][0] = pj[k] - pi[k];
-    //     m[k][1] = pl[k] - pi[k];
-    //     m[k][2] = -(FT(f.voronoi_vertices[1].point[k]) - FT(f.voronoi_vertices[0].point[k]));
-    //     m[k][3] = -(FT(f.voronoi_vertices[2].point[k]) - FT(f.voronoi_vertices[0].point[k]));
-    //     m[k][4] = FT(f.voronoi_vertices[0].point[k]) - pi[k];
-    // }
-    //
-    // // Gaussian elimination with exact FT (no rounding — just need non-zero pivots)
-    // for (int col = 0; col < 4; ++col) {
-    //     int pivot = -1;
-    //     for (int row = col; row < 4; ++row) {
-    //         if (m[row][col] != FT(0)) { pivot = row; break; }
-    //     }
-    //     if (pivot == -1) {
-    //         if (test) std::cout << "2" << std::endl;
-    //         return false;
-    //     } // singular
-    //     if (pivot != col)
-    //         for (int j = col; j < 5; ++j) std::swap(m[col][j], m[pivot][j]);
-    //     for (int row = col + 1; row < 4; ++row) {
-    //         FT factor = m[row][col] / m[col][col];
-    //         for (int j = col; j < 5; ++j)
-    //             m[row][j] -= factor * m[col][j];
-    //     }
-    // }
-    // // Back substitution
-    // FT sol[4];
-    // for (int i = 3; i >= 0; --i) {
-    //     sol[i] = m[i][4];
-    //     for (int j = i + 1; j < 4; ++j)
-    //         sol[i] -= m[i][j] * sol[j];
-    //     sol[i] /= m[i][i];
-    // }
-    //
-    // FT s = sol[0], t = sol[1], u = sol[2], w = sol[3];
-    //
-    // // Triangle: strictly inside iff s > 0, t > 0, s + t < 1
-    // if (!(s >= FT(0) && t >= FT(0) && s + t <= FT(1))) {
-    //     if (test) std::cout << "3" << std::endl;
-    //     return false;
-    // }
-    //
-    // // Voronoi polygon containment in exact FT
-    // // Project each polygon vertex to (f1, f2) frame using a 2x2 subsystem
-    // FT fv1[4], fv2[4];
-    // for (int k = 0; k < 4; ++k) {
-    //     fv1[k] = FT(f.voronoi_vertices[1].point[k]) - FT(f.voronoi_vertices[0].point[k]);
-    //     fv2[k] = FT(f.voronoi_vertices[2].point[k]) - FT(f.voronoi_vertices[0].point[k]);
-    // }
-    //
-    // // Find two rows where [f1|f2] has a non-zero 2x2 determinant
-    // int r1 = -1, r2 = -1;
-    // for (int a = 0; a < 4 && r1 == -1; ++a)
-    //     for (int b = a + 1; b < 4 && r1 == -1; ++b)
-    //         if (fv1[a] * fv2[b] - fv1[b] * fv2[a] != FT(0))
-    //             { r1 = a; r2 = b; }
-    // if (r1 == -1) {
-    //     if (test) std::cout << "4" << std::endl;
-    //     return false;
-    // }
-    //
-    // FT det_f = fv1[r1] * fv2[r2] - fv1[r2] * fv2[r1];
-    //
-    // // Project polygon vertices to 2D (u_k, w_k) coordinates
-    // std::vector<std::pair<FT, FT>> P(nv);
-    // for (int i = 0; i < nv; ++i) {
-    //     FT dv_r1 = FT(f.voronoi_vertices[i].point[r1]) - FT(f.voronoi_vertices[0].point[r1]);
-    //     FT dv_r2 = FT(f.voronoi_vertices[i].point[r2]) - FT(f.voronoi_vertices[0].point[r2]);
-    //     P[i] = { (dv_r1 * fv2[r2] - dv_r2 * fv2[r1]) / det_f,
-    //               (fv1[r1] * dv_r2 - fv1[r2] * dv_r1) / det_f };
-    // }
-    //
-    // // Signed area to determine winding
-    // FT area2(0);
-    // for (int i = 0; i < nv; ++i) {
-    //     int j = (i + 1) % nv;
-    //     area2 += P[i].first * P[j].second - P[j].first * P[i].second;
-    // }
-    // if (area2 == FT(0)) {
-    //     if (test) std::cout << "5" << std::endl;
-    //     return false;
-    // }
-    //
-    // // Check that (u, w) is strictly inside every edge
-    // for (int i = 0; i < nv; ++i) {
-    //     int j = (i + 1) % nv;
-    //     FT ex = P[j].first  - P[i].first;
-    //     FT ey = P[j].second - P[i].second;
-    //     FT wx = u - P[i].first;
-    //     FT wy = w - P[i].second;
-    //     FT cross = ex * wy - ey * wx;
-    //     if (area2 > FT(0) ? cross <= FT(0) : cross >= FT(0)) {
-    //         if (test) std::cout << "6" << std::endl;
-    //         return false;
-    //     }
-    // }
-    //
-    // if (test == false) std::cout << "waaaa" << std::endl;
-    // return true;
+    bool result = test && dot()(Vector(pj) - pi, Vector(pl) - pi) >= 0 && dot()(Vector(pi) - pj, Vector(pl) -pj ) >= 0 && dot()(Vector(pi) - pl, Vector(pj) - pl) >= 0;
+    if (result && !test2) {
+        std::cerr << "Test failed!" << std::endl;
+    }
+    return result;
 }
 
 bool is_gabriel(const Edge &edge, const Delaunay &dt) {
