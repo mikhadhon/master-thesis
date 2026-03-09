@@ -13,7 +13,9 @@ int main() {
     int dim = 4;
 
     Eigen::MatrixXd V;
-    V = cliffordgen(1000);
+    Eigen::MatrixXi F;
+    //V = cliffordgen(1000);
+    read_obj("../output/cliffordgen.obj_20260309_110635.obj", V, F);
 
     std::vector<Point> points;
     for (int i = 0; i < V.rows(); i++) {
@@ -33,6 +35,7 @@ int main() {
     write_faces_to_vector(dt, faces, vertex_to_index);
     Eigen::MatrixXd V_projected = stereo_projection(V);
 
+    //write_to_obj(V, F, "cliffordgen.obj");
     polyscope::init();
     // auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", V_projected, faces);
     auto *pcCloud = polyscope::registerPointCloud("delaunay vertices", V_projected);

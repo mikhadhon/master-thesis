@@ -112,6 +112,23 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                                 faces.push_back(fc_face2);
                                 non_gabriel_faces.push_back(fc_face1);
                                 non_gabriel_faces.push_back(fc_face2);
+
+                                Delaunay::Vertex_handle new_v;
+                                for (int i = 0; i < 3; i++) {
+                                    if (dual_delaunay_face.face.vertex(i) != current_edge.vertex1 && dual_delaunay_face.face.vertex(i) != current_edge.vertex2) {
+                                        new_v = dual_delaunay_face.face.vertex(i);
+                                        break;
+                                    }
+                                }
+                                if (violators.size() > 1) {
+                                    for (auto v: violators) {
+                                        std::cout << v.first->point() << std::endl;
+                                        std::cout << v.second << std::endl;
+                                        if (new_v == v.first) std::cout << "new_v" << std::endl;
+
+                                    }
+                                    std::cout << "-----" << std::endl;
+                                }
                             }
                         }
 

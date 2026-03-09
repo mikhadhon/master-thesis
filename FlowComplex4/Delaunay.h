@@ -111,6 +111,10 @@ struct Voronoi_face {
     std::vector<Eigen::VectorXd> ps_vertices;
     std::vector<std::array<size_t, 2>> ps_edges;
     Face dual;
+
+    bool operator==(const Voronoi_face & other) const {
+        return dual == other.dual;
+    }
 };
 
 std::vector<Voronoi_face> delaunay_edge_dual(const Edge &edge, const Face &df, const Delaunay &dt);

@@ -24,7 +24,7 @@ Eigen::MatrixXd cliffordgen(int nsamples) {
         double q = angle_p(gen);
 
         double a = 1;
-        double b = 1 + noise(gen);
+        double b = 1 /*+ noise(gen)*/;
 
         auto sample = Eigen::Vector4d(a * cos(p), a * sin(p), b * cos(q), b * sin(q));
         sample *= radius;
