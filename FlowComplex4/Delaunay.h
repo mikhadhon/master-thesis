@@ -141,6 +141,10 @@ void get_facet_vertices(
 
 void get_tetrahedron_normal(const std::vector<Eigen::VectorXd> &tetrahedron_points, Eigen::VectorXd &normal);
 
+std::vector<Delaunay::Vertex_handle> collect_gabriel_violators(const Edge &edge, const Delaunay &dt);
+
+Face get_face_from_edge_and_vertex(const Edge &edge, const Delaunay::Vertex_handle &vh, const Delaunay &dt);
+
 std::unordered_set<Face, FaceHash> get_delaunay_faces(Delaunay &dt);
 
 std::unordered_set<Face, FaceHash> get_incident_faces_to_edge(const Edge &edge, const Delaunay &dt);

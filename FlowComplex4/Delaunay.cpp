@@ -203,7 +203,7 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
 
             // Vector exact_direction(n0, n1, n2, n3);
 
-            Point infinite_point = Vector(finite_circumcenter) + Point(9999 * exact_direction[0], 9999 * exact_direction[1], 9999 * exact_direction[2], 9999 * exact_direction[3]);
+            Point infinite_point = Vector(finite_circumcenter) + Point(99999999 * exact_direction[0], 99999999 * exact_direction[1], 99999999 * exact_direction[2], 99999999 * exact_direction[3]);
 
             voronoi_vertex = Voronoi_vertex{true, infinite_point, exact_direction};
             infinite_vertices.push_back(infinite_point);
@@ -259,25 +259,21 @@ void insert_points(const std::vector<Point> &points, Delaunay &delaunay) {
     }
 }
 
-bool intersect_df_vp_d(const Face &df, Voronoi_face &vp, Point &out) {
+bool intersect_df_vp_d(const Face &df, Voronoi_face &vp, Point &out, const Delaunay &dt) {
     Point pi = df.face.vertex(0)->point();
     Point pj = df.face.vertex(1)->point();
     Point pl = df.face.vertex(2)->point();
 
+    std::vector v_debug = {pi, pj, pl};
+
     const int nv = static_cast<int>(vp.voronoi_vertices.size());
 
-    // Find three finite basis vertices for the polygon plane
     int b0 = -1, b1 = -1, b2 = -1;
     for (int i = 0; i < nv; ++i) {
         if (b0 == -1) b0 = i;
         else if (b1 == -1) b1 = i;
         else { b2 = i; break; }
     }
-
-    // Build 4x4 system in exact FT:
-    // [e1 | e2 | -f1 | -f2] * [s; t; u; w] = V[b0] - pi
-    // e1 = pj - pi, e2 = pl - pi
-    // f1 = V[b1] - V[b0], f2 = V[b2] - V[b0]
 
     LA_Matrix M(4,4);
     for (int k = 0; k < 4; ++k) {
@@ -297,90 +293,39 @@ bool intersect_df_vp_d(const Face &df, Voronoi_face &vp, Point &out) {
     FT D;
     LA::linear_solver(M, b, x, D);
 
-    FT s = x[0], t = x[1], u = x[2], w = x[3];
+    FT s = x[0]/D, t = x[1]/D;
+
+    Vector pjpi = (Vector(pj) - pi);
+    Vector spjpi = Vector(s * pjpi[0], s * pjpi[1], s * pjpi[2], s * pjpi[3]);
+    Vector plpi = (Vector(pl) - pi);
+    Vector tplpi = Vector(t * plpi[0], t * plpi[1], t * plpi[2], t * plpi[3]);
+    Vector p_int = pi + spjpi + tplpi;
+    out = p_int;
 
     // Triangle containment: s >= 0, t >= 0, s + t <= 1
     if (!(s >= FT(0) && t >= FT(0) && s + t <= FT(1))) {
         return false;
     }
 
-    Vector pjpi = (Vector(pj) - pi);
-    Vector spjpi = Vector(s * pjpi[0], s * pjpi[1], s * pjpi[2], s * pjpi[3]);
-    Vector plpi = (Vector(pl) - pi);
-    Vector tpjpi = Vector(t * plpi[0], t * plpi[1], t * plpi[2], t * plpi[3]);
-    Vector p_int = pi + spjpi + tpjpi;
-    out = p_int;
+    std::vector<Delaunay::Full_cell_handle> cell_neighbors;
+    get_incident_cells_to_face(df, dt, cell_neighbors);
+    std::set<Delaunay::Vertex_handle> neighboring_vertices;
 
-    // Debug: centroid of finite vertices is guaranteed inside the polygon
-    FT cx(0), cy(0), cz(0), cw(0);
-    for (int i = 0; i < nv; ++i) {
-        if (!vp.voronoi_vertices[i].is_infinite) {
-            cx += vp.voronoi_vertices[i].point[0];
-            cy += vp.voronoi_vertices[i].point[1];
-            cz += vp.voronoi_vertices[i].point[2];
-            cw += vp.voronoi_vertices[i].point[3];
-        }
-        else {
-            Voronoi_vertex finite_neighbor = vp.voronoi_vertices[(i + 1) % vp.voronoi_vertices.size()].is_infinite ? vp.voronoi_vertices[(i - 1) % vp.voronoi_vertices.size()] : vp.voronoi_vertices[(i + 1) % vp.voronoi_vertices.size()];
-            cx += finite_neighbor.point[0] + vp.voronoi_vertices[i].infinite_direction[0];
-            cy += finite_neighbor.point[1] + vp.voronoi_vertices[i].infinite_direction[1];
-            cz += finite_neighbor.point[2] + vp.voronoi_vertices[i].infinite_direction[2];
-            cw += finite_neighbor.point[3] + vp.voronoi_vertices[i].infinite_direction[3];
+    for (const auto cell : cell_neighbors) {
+        for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
+            neighboring_vertices.insert(*v);
         }
     }
-    int count = vp.voronoi_vertices.size();
-    Point centroid(cx / count, cy / count, cz / count, cw / count);
-
-    // Check containment: all edge determinants must have the same sign
-    int sign = 0;
-    for (const auto &edge : vp.voronoi_edges) {
-        Point ref;
-        Vector vec;
-
-        if (!edge.vertex1.is_infinite && !edge.vertex2.is_infinite) {
-            ref = edge.vertex1.point;
-            vec = Vector(edge.vertex2.point) - edge.vertex1.point;
-        }
-        else if (!edge.vertex1.is_infinite && edge.vertex2.is_infinite) {
-            ref = edge.vertex1.point;
-            vec = edge.vertex2.infinite_direction;
-        }
-        else if (edge.vertex1.is_infinite && !edge.vertex2.is_infinite) {
-            ref = edge.vertex2.point;
-            vec = -edge.vertex1.infinite_direction;
-        }
-        else continue;
-        auto orientation_test = [&](const Point& p) {
-            std::vector<Point> simplex = {
-                p,
-                ref,
-                Point(Vector(ref) + vec),
-                Point(Vector(ref) + pi),
-                Point(Vector(ref) + pj)
-            };
-            return orientation()(simplex.begin(), simplex.end());
-        };
-
-        auto o_point = orientation_test(p_int);
-        auto o_centroid = orientation_test(centroid);
-        if (o_point == CGAL::ZERO) {
-            continue;
-        }
-
-        if (o_point != o_centroid && o_centroid != CGAL::ZERO) {
+    FT sq_dist_out_dual = squared_distance()(out, df.face.vertex(0)->point());
+    for (Delaunay::Vertex_handle v :neighboring_vertices) {
+        FT sq_dist_out_neighbor = squared_distance()(out, v->point());
+        if (sq_dist_out_neighbor < sq_dist_out_dual) {
             return false;
         }
-        // if (sign == 0) {
-        //     sign = (o_point > 0) ? 1 : -1;
-        // }
-        // else if ((sign == 1 && o_point < 0) || (sign == -1 && o_point > 0)) {
-        //     return false;
-        // }
     }
 
     return true;
 }
-
 
 bool is_index_two_critical_point(const Face &face, const Delaunay &dt) {
     Voronoi_face f = delaunay_face_dual(face, dt);
@@ -422,7 +367,13 @@ bool is_index_two_critical_point(const Face &face, const Delaunay &dt) {
     Point pj = face.face.vertex(1)->point();
     Point pl = face.face.vertex(2)->point();
 
-    return dot()(Vector(pj) - pi, Vector(pl) - pi) >= 0 && dot()(Vector(pi) - pj, Vector(pl) -pj ) >= 0 && dot()(Vector(pi) - pl, Vector(pj) - pl) >= 0;
+    // Voronoi_face a = delaunay_face_dual(face, dt);
+    // Point out;
+    // bool debug = intersect_df_vp_d(face, a, out, dt);
+
+    bool result = dot()(Vector(pj) - pi, Vector(pl) - pi) >= 0 && dot()(Vector(pi) - pj, Vector(pl) -pj ) >= 0 && dot()(Vector(pi) - pl, Vector(pj) - pl) >= 0;
+
+    return result;
 }
 
 bool is_gabriel(const Edge &edge, const Delaunay &dt) {
@@ -463,6 +414,36 @@ bool is_gabriel(const Edge &edge, const Delaunay &dt) {
     // }
 
     return true;
+}
+
+std::vector<Delaunay::Vertex_handle> collect_gabriel_violators(const Edge &edge, const Delaunay &dt) {
+    Point p1 = edge.vertex1->point();
+    Point p2 = edge.vertex2->point();
+
+    Point edge_midpoint = midpoint()(p1, p2);
+    const FT sq_radius = squared_distance()(p1, edge_midpoint);
+
+    std::vector<Delaunay::Full_cell_handle> cell_neighbors;
+    get_incident_cells_to_edge(edge, dt, cell_neighbors);
+    std::set<Delaunay::Vertex_handle> neighboring_vertices;
+
+    for (const auto cell : cell_neighbors) {
+        for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
+            neighboring_vertices.insert(*v);
+        }
+    }
+
+    std::vector<Delaunay::Vertex_handle> violators;
+    for (auto v : neighboring_vertices) {
+        if (v == edge.vertex1 || v == edge.vertex2) continue;
+        if (dt.is_infinite(v)) continue;
+
+        FT sq_dist = squared_distance()(edge_midpoint, v->point());
+        if (sq_dist < sq_radius) {
+            violators.push_back(v);
+        }
+    }
+    return violators;
 }
 
 void get_incident_cells_to_edge(const Edge &edge, const Delaunay &dt, std::vector<Delaunay::Full_cell_handle> &cell_neighbors) {
@@ -541,6 +522,34 @@ void find_gabriel_edges(Delaunay &dt, std::vector<Edge> &gabriel_edges) {
             }
         }
     }
+}
+
+Face get_face_from_edge_and_vertex(const Edge &edge, const Delaunay::Vertex_handle &vh, const Delaunay &dt) {
+    std::vector<Delaunay::Full_cell_handle> vh_incident_cells;
+    dt.incident_full_cells(vh, std::back_inserter(vh_incident_cells));
+
+    Delaunay::Full_cell_handle new_face_full_cell;
+    for (const auto cell : vh_incident_cells) {
+        if (cell->has_vertex(edge.vertex1) && cell->has_vertex(edge.vertex2) && !dt.is_infinite(cell)) {
+            new_face_full_cell = cell;
+            break;
+        }
+    }
+
+    Delaunay::Face new_face(new_face_full_cell);
+    std::vector face_vertices = {vh, edge.vertex1, edge.vertex2};
+    std::ranges::sort(face_vertices);
+    for (int l = 0; l < 3; ++l){
+        new_face.set_index(l, new_face_full_cell->index(face_vertices[l]));
+    }
+    Face face(new_face, -1, -1);
+    for (auto vertex = new_face_full_cell->vertices_begin(); vertex != new_face_full_cell->vertices_end(); ++vertex) {
+        if (*vertex != face.face.vertex(0) && *vertex != face.face.vertex(1) && *vertex != face.face.vertex(2)) {
+            if (face.index_of_covertex_0 == -1) face.index_of_covertex_0 = new_face_full_cell->index(*vertex);
+            else if (face.index_of_covertex_1 == -1) face.index_of_covertex_1 = new_face_full_cell->index(*vertex);
+        }
+    }
+    return face;
 }
 
 std::unordered_set<Face, FaceHash> get_delaunay_faces(Delaunay &dt) {

@@ -7,10 +7,15 @@
 #include "FlowComplex.h"
 #include "utils.h"
 
-bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out) {
-    Point pi = df.face.vertex(0)->point();
-    Point pj = df.face.vertex(1)->point();
-    Point pl = df.face.vertex(2)->point();
+bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out, const Edge &current_edge, const Point &current_center, const Delaunay &dt) {
+    // Point pi = df.face.vertex(0)->point();
+    // Point pj = df.face.vertex(1)->point();
+    // Point pl = df.face.vertex(2)->point();
+    Point pi = current_edge.vertex1->point();
+    Point pj = current_edge.vertex2->point();
+    Point pl = current_center;
+
+    std::vector v_debug = {pi, pj, pl};
 
     const int nv = static_cast<int>(vp.voronoi_vertices.size());
 
@@ -39,52 +44,79 @@ bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out) {
     FT D;
     LA::linear_solver(M, b, x, D);
 
-    FT s = x[0], t = x[1], u = x[2], w = x[3];
-
-    // Triangle containment: s >= 0, t >= 0, s + t <= 1
-    if (!(s > FT(0) && t > FT(0) && s + t < FT(1))) {
-        return false;
-    }
+    FT s = x[0]/D, t = x[1]/D;
 
     Vector pjpi = (Vector(pj) - pi);
     Vector spjpi = Vector(s * pjpi[0], s * pjpi[1], s * pjpi[2], s * pjpi[3]);
     Vector plpi = (Vector(pl) - pi);
-    Vector tpjpi = Vector(t * plpi[0], t * plpi[1], t * plpi[2], t * plpi[3]);
-    Vector p_int = pi + spjpi + tpjpi;
+    Vector tplpi = Vector(t * plpi[0], t * plpi[1], t * plpi[2], t * plpi[3]);
+    Vector p_int = pi + spjpi + tplpi;
     out = p_int;
 
-    Voronoi_vertex v_vertex_base = vp.voronoi_vertices.front();
-    auto v_vertex_it = vp.voronoi_vertices.begin();
-    while (v_vertex_base.is_infinite) {
-        v_vertex_base = *(++v_vertex_it);
+    // Triangle containment: s >= 0, t >= 0, s + t <= 1
+    if (!(s >= FT(0) && t >= FT(0) && s + t <= FT(1))) {
+        return false;
     }
-    LA_Vector v_0(v_vertex_base.point.cartesian_begin(), v_vertex_base.point.cartesian_end());
 
-    for (int i = 0; i < vp.voronoi_vertices.size(); ++i) {
-        if (vp.voronoi_vertices[i] == v_vertex_base) continue;
-        int next = (i + 1) % vp.voronoi_vertices.size();
-        if (vp.voronoi_vertices[next] == v_vertex_base) next = (i + 2) % vp.voronoi_vertices.size();
-        LA_Vector v_1(vp.voronoi_vertices[i].point.cartesian_begin(), vp.voronoi_vertices[i].point.cartesian_end());
-        LA_Vector v_2(vp.voronoi_vertices[next].point.cartesian_begin(), vp.voronoi_vertices[next].point.cartesian_end());
-        std::vector matrix_cols = {v_1 - v_0, v_2 - v_0};
-
-        LA_Matrix M_P(matrix_cols.begin(), matrix_cols.end());
-        LA_Vector b_P(4);
-        auto c = b_P.begin();
-        for (int k = 0; k < 4; ++k) {
-            *c++ = out[k] - v_0[k];
+    Delaunay::Vertex_handle dual_point;
+    for (int i = 0; i < 3; i++) {
+        if (vp.dual.face.vertex(i) != current_edge.vertex1 && vp.dual.face.vertex(i) != current_edge.vertex2) {
+            dual_point = vp.dual.face.vertex(i);
         }
-        LA_Vector x_p(4);
-        FT D_p;
+    }
+    std::vector<Delaunay::Full_cell_handle> cell_neighbors;
+    get_incident_cells_to_edge(current_edge, dt, cell_neighbors);
+    std::set<Delaunay::Vertex_handle> neighboring_vertices;
 
-        LA::linear_solver(M_P, b_P, x_p, D_p);
-
-        if (x_p[0] >= FT(0) && x_p[1] >= FT(0) && x_p[0] + x_p[1] <= FT(1)) {
-            return true;
+    for (const auto cell : cell_neighbors) {
+        for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
+            neighboring_vertices.insert(*v);
+        }
+    }
+    FT sq_dist_out_dual = squared_distance()(out, current_edge.vertex1->point());
+    for (Delaunay::Vertex_handle v :neighboring_vertices) {
+        if (v == current_edge.vertex1 || v == current_edge.vertex2 || v == dual_point) continue;
+        FT sq_dist_out_neighbor = squared_distance()(out, v->point());
+        if (sq_dist_out_neighbor < sq_dist_out_dual) {
+            return false;
         }
     }
 
-    return false;
+    return true;
+
+    // Voronoi_vertex v_vertex_base = vp.voronoi_vertices.front();
+    // auto v_vertex_it = vp.voronoi_vertices.begin();
+    // while (v_vertex_base.is_infinite) {
+    //     v_vertex_base = *(++v_vertex_it);
+    // }
+    // LA_Vector v_0(v_vertex_base.point.cartesian_begin(), v_vertex_base.point.cartesian_end());
+    //
+    // for (int i = 0; i < vp.voronoi_vertices.size(); ++i) {
+    //     if (vp.voronoi_vertices[i] == v_vertex_base) continue;
+    //     int next = (i + 1) % vp.voronoi_vertices.size();
+    //     if (vp.voronoi_vertices[next] == v_vertex_base) continue;
+    //     LA_Vector v_1(vp.voronoi_vertices[i].point.cartesian_begin(), vp.voronoi_vertices[i].point.cartesian_end());
+    //     LA_Vector v_2(vp.voronoi_vertices[next].point.cartesian_begin(), vp.voronoi_vertices[next].point.cartesian_end());
+    //     std::vector matrix_cols = {v_1 - v_0, v_2 - v_0};
+    //
+    //     LA_Matrix M_P(matrix_cols.begin(), matrix_cols.end());
+    //     LA_Vector b_P(4);
+    //     auto c = b_P.begin();
+    //     for (int k = 0; k < 4; ++k) {
+    //         *c++ = out[k] - v_0[k];
+    //     }
+    //     LA_Vector x_p(4);
+    //     FT D_p;
+    //
+    //     bool test = LA::linear_solver(M_P, b_P, x_p, D_p);
+    //     if (!test) std::cout << "Error" << std::endl;
+    //
+    //     if (x_p[0]/D >= FT(0) && x_p[1]/D >= FT(0) && x_p[0]/D + x_p[1]/D <= FT(1)) {
+    //         return true;
+    //     }
+    // }
+    //
+    // return false;
 }
 
 void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, std::vector<std::array<size_t, 3>> &faces, std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index) {
@@ -129,6 +161,8 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                         gabriel_edges.push_back({vertex_to_index[current_edge.vertex1], vertex_to_index[current_edge.vertex2]});
                     }
                     else {
+                        std::vector triangle_vertices = {current_delaunay_face.face.vertex(0)->point(), current_delaunay_face.face.vertex(1)->point(), current_delaunay_face.face.vertex(2)->point()};
+
                         std::vector<Delaunay::Full_cell_handle> neighboring_cells;
 
                         Point edge_mid = midpoint()(current_edge.vertex1->point(), current_edge.vertex2->point());
@@ -140,19 +174,66 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                         std::vector<Voronoi_face> voronoi_faces = delaunay_edge_dual(current_edge, current_delaunay_face, delaunay);
 
                         bool intersected = false;
+                        std::vector line_debug = {current_center, edge_mid};
+                        std::vector<std::pair<Point, Face>> intersections;
+                        Point cc = circumcenter()(triangle_vertices.begin(), triangle_vertices.end());
+                        int count_dist = 0;
                         for (auto v_face : voronoi_faces) {
                             Point out;
-                            if (intersect_df_vp(current_delaunay_face, v_face, out)) {
+                            bool test_intersect = intersect_df_vp(current_delaunay_face, v_face, out, current_edge, current_center, delaunay);
+                            if (test_intersect) {
                                 intersected = true;
                                 next.push_back({out, v_face.dual});
                             }
+                            intersections.push_back({out, v_face.dual});
                         }
+                        // Point dual_point;
+                        // for (int i = 0; i < 3; i++) {
+                        //     if (next.begin()->second.face.vertex(i) != current_edge.vertex1 && next.begin()->second.face.vertex(i) != current_edge.vertex2) {
+                        //         dual_point = next.begin()->second.face.vertex(i)->point();
+                        //     }
+                        // }
+                        // std::vector<Delaunay::Full_cell_handle> cell_neighbors;
+                        // get_incident_cells_to_edge(current_edge, delaunay, cell_neighbors);
+                        // std::set<Delaunay::Vertex_handle> neighboring_vertices;
+                        //
+                        // for (const auto cell : cell_neighbors) {
+                        //     for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
+                        //         neighboring_vertices.insert(*v);
+                        //     }
+                        // }
+                        // FT sq_dist_out_dual = squared_distance()(next.begin()->first, dual_point);
+                        // for (Delaunay::Vertex_handle v : neighboring_vertices) {
+                        //     FT sq_dist_out_neighbor = squared_distance()(next.begin()->first, v->point());
+                        //     if (sq_dist_out_neighbor < sq_dist_out_dual) {
+                        //         test_dist = false;
+                        //     }
+                        // }
+                        // if (test_dist) {
+                        //     count_dist++;
+                        // }
 
                         if (!intersected) {
                             missed_intersections++;
+                            // std::vector<Delaunay::Vertex_handle> gabriel_violators = collect_gabriel_violators(current_edge, delaunay);
+                            // std::vector new_line = {cc, edge_mid};
+                            // std::vector<std::pair<Point, Face>> intersections_fallback;
+                            // for (Delaunay::Vertex_handle gv : gabriel_violators) {
+                            //     Face gv_delaunay_face = get_face_from_edge_and_vertex(current_edge, gv, delaunay);
+                            //     Voronoi_face gv_voronoi_face = delaunay_face_dual(gv_delaunay_face, delaunay);
+                            //     Point gv_out;
+                            //     intersect_df_vp(current_delaunay_face, gv_voronoi_face, gv_out);
+                            //     intersections_fallback.push_back({gv_out, gv_delaunay_face});
+                            //     // if (!contained_in_affine_hull()(new_line.begin(), new_line.end(), gv_out)) {
+                            //     //     std::cout << "Not contained" << std::endl;
+                            //     // }
+                            // }
                         }
                         if (next.size() > 1) {
-                            std::cout << "Multiple intersections: " << next.size() << std::endl;
+                            // std::cout << "Multiple intersections" << std::endl;
+                            // for (auto [s_prime, next_face] : next) {
+                            //     std::cout << s_prime << std::endl;
+                            // }
                             mulitple++;
                         }
 
