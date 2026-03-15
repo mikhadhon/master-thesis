@@ -21,6 +21,8 @@ add_executable(
         utils.h
         FlowComplex.cpp
         FlowComplex.h
+        data_generation.cpp
+        data_generation.h
 )
 
 find_package(CGAL CONFIG REQUIRED)

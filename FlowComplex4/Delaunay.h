@@ -16,16 +16,11 @@ typedef CGAL::Delaunay_triangulation<K> Delaunay;
 typedef K::Midpoint_d midpoint;
 typedef K::Construct_circumcenter_d circumcenter;
 typedef K::Squared_distance_d squared_distance;
-typedef K::Contained_in_simplex_d contained_in_simplex;
 typedef K::Scalar_product_d dot;
-typedef K::Equal_d equal;
+
 typedef CGAL::Linear_algebraCd<FT> LA;
 typedef LA::Matrix LA_Matrix;
 typedef LA::Vector LA_Vector;
-typedef K::Contained_in_simplex_d contained_in_simplex;
-typedef K::Orientation_d orientation;
-typedef K::Contained_in_affine_hull_d contained_in_affine_hull;
-typedef K::Contained_in_linear_hull_d contained_in_linear_hull;
 
 struct Edge {
     Delaunay::Vertex_handle vertex1;
@@ -121,8 +116,6 @@ std::vector<Voronoi_face> delaunay_edge_dual(const Edge &edge, const Face &df, c
 
 Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt);
 
-Eigen::VectorXd simplex_circumsphere(const Delaunay::Full_cell_handle &simplex);
-
 void insert_points(const std::vector<Point> &points, Delaunay &delaunay);
 
 bool is_index_two_critical_point(const Face &face, const Delaunay &dt);
@@ -132,18 +125,6 @@ bool is_gabriel(const Edge &edge, const Delaunay &dt);
 void get_incident_cells_to_edge(const Edge &edge, const Delaunay &dt, std::vector<Delaunay::Full_cell_handle> &cell_neighbors);
 
 void get_incident_cells_to_face(const Face &face, const Delaunay &dt, std::vector<Delaunay::Full_cell_handle> &cell_neighbors);
-
-void get_facet_vertices(
-    const Delaunay &delaunay,
-    const Delaunay::Facet_iterator &facet,
-    std::vector<Delaunay::Vertex_handle> &facet_vertices
-);
-
-void get_tetrahedron_normal(const std::vector<Eigen::VectorXd> &tetrahedron_points, Eigen::VectorXd &normal);
-
-std::vector<Delaunay::Vertex_handle> collect_gabriel_violators(const Edge &edge, const Delaunay &dt);
-
-Face get_face_from_edge_and_vertex(const Edge &edge, const Delaunay::Vertex_handle &vh, const Delaunay &dt);
 
 std::unordered_set<Face, FaceHash> get_delaunay_faces(Delaunay &dt);
 

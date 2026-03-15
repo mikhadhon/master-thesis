@@ -5,7 +5,6 @@
 #include "utils.h"
 #include "polyscope/curve_network.h"
 #include "polyscope/point_cloud.h"
-#include "polyscope/surface_mesh.h"
 
 Delaunay::Full_cell_handle get_next_cell(const Delaunay::Full_cell_handle &current_cell, const Face &face, const Delaunay::Vertex_handle current_opposite, const Delaunay &dt) {
     for (int i = 0; i <= dt.maximal_dimension(); ++i) {
@@ -197,11 +196,6 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
             if (dot()(exact_direction, Vector(opposite_point) - p0) > FT(0)) {
                 exact_direction = -exact_direction;
             }
-            // if (to_opp_dot > FT(0)) {
-            //     n0 = -n0; n1 = -n1; n2 = -n2; n3 = -n3;
-            // }
-
-            // Vector exact_direction(n0, n1, n2, n3);
 
             Point infinite_point = Vector(finite_circumcenter) + Point(99999999 * exact_direction[0], 99999999 * exact_direction[1], 99999999 * exact_direction[2], 99999999 * exact_direction[3]);
 
@@ -226,21 +220,7 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
             ps_edges.push_back({i, next_i});
         }
     }
-    //polyscope::registerPointCloud("infinite voronoi vertices", infinite_vertices);
     return Voronoi_face{voronoi_vertices, voronoi_edges, ps_vertices, ps_edges, face};
-}
-
-// Face voronoi_edge_dual(Voronoi_edge &voronoi_edge) {
-//
-// }
-
-Eigen::VectorXd simplex_circumsphere(const Delaunay::Full_cell_handle &simplex) {
-    std::vector<Point> simplex_points;
-    for (auto point = simplex->vertices_begin(); point != simplex->vertices_end(); ++point) {
-        simplex_points.push_back((*point)->point());
-    }
-    const Point cgal_center = circumcenter()(simplex_points.begin(), simplex_points.end());
-    return make_point_eigen(cgal_center);
 }
 
 void insert_points(const std::vector<Point> &points, Delaunay &delaunay) {
@@ -252,79 +232,10 @@ void insert_points(const std::vector<Point> &points, Delaunay &delaunay) {
         else {
             hint = delaunay.insert(point);
         }
-        // printf("Processing: %d/%d\n", ++i, static_cast<int>(points.size()));
     }
     if (!delaunay.is_valid()) {
         std::cerr << "Triangulation is invalid!" << std::endl;
     }
-}
-
-bool intersect_df_vp_d(const Face &df, Voronoi_face &vp, Point &out, const Delaunay &dt) {
-    Point pi = df.face.vertex(0)->point();
-    Point pj = df.face.vertex(1)->point();
-    Point pl = df.face.vertex(2)->point();
-
-    std::vector v_debug = {pi, pj, pl};
-
-    const int nv = static_cast<int>(vp.voronoi_vertices.size());
-
-    int b0 = -1, b1 = -1, b2 = -1;
-    for (int i = 0; i < nv; ++i) {
-        if (b0 == -1) b0 = i;
-        else if (b1 == -1) b1 = i;
-        else { b2 = i; break; }
-    }
-
-    LA_Matrix M(4,4);
-    for (int k = 0; k < 4; ++k) {
-        auto row = M.row_begin(k);
-        *row++ = pj[k] - pi[k];
-        *row++ = pl[k] - pi[k];
-        *row++ = -(vp.voronoi_vertices[b1].point[k] - vp.voronoi_vertices[b0].point[k]);
-        *row = -(vp.voronoi_vertices[b2].point[k] - vp.voronoi_vertices[b0].point[k]);
-    }
-    LA_Vector b(4);
-    auto coord = b.begin();
-    for (int k = 0; k < 4; ++k) {
-        *coord++ = vp.voronoi_vertices[b0].point[k] - pi[k];
-    }
-
-    LA_Vector x(4);
-    FT D;
-    LA::linear_solver(M, b, x, D);
-
-    FT s = x[0]/D, t = x[1]/D;
-
-    Vector pjpi = (Vector(pj) - pi);
-    Vector spjpi = Vector(s * pjpi[0], s * pjpi[1], s * pjpi[2], s * pjpi[3]);
-    Vector plpi = (Vector(pl) - pi);
-    Vector tplpi = Vector(t * plpi[0], t * plpi[1], t * plpi[2], t * plpi[3]);
-    Vector p_int = pi + spjpi + tplpi;
-    out = p_int;
-
-    // Triangle containment: s >= 0, t >= 0, s + t <= 1
-    if (!(s >= FT(0) && t >= FT(0) && s + t <= FT(1))) {
-        return false;
-    }
-
-    std::vector<Delaunay::Full_cell_handle> cell_neighbors;
-    get_incident_cells_to_face(df, dt, cell_neighbors);
-    std::set<Delaunay::Vertex_handle> neighboring_vertices;
-
-    for (const auto cell : cell_neighbors) {
-        for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
-            neighboring_vertices.insert(*v);
-        }
-    }
-    FT sq_dist_out_dual = squared_distance()(out, df.face.vertex(0)->point());
-    for (Delaunay::Vertex_handle v :neighboring_vertices) {
-        FT sq_dist_out_neighbor = squared_distance()(out, v->point());
-        if (sq_dist_out_neighbor < sq_dist_out_dual) {
-            return false;
-        }
-    }
-
-    return true;
 }
 
 bool is_index_two_critical_point(const Face &face, const Delaunay &dt) {
@@ -333,8 +244,6 @@ bool is_index_two_critical_point(const Face &face, const Delaunay &dt) {
     Point cc = circumcenter()(face_vertices.begin(), face_vertices.end());
     const FT sq_radius = squared_distance()(cc, face.face.vertex(0)->point());
 
-    // std::vector<Delaunay::Full_cell_handle> cell_neighbors;
-    // get_incident_cells_to_face(face, dt, cell_neighbors);
     std::set<Delaunay::Vertex_handle> neighboring_vertices;
 
     for (int i = 0; i < 3; ++i) {
@@ -346,12 +255,6 @@ bool is_index_two_critical_point(const Face &face, const Delaunay &dt) {
             }
         }
     }
-
-    // for (const auto cell : cell_neighbors) {
-    //     for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
-    //         neighboring_vertices.insert(*v);
-    //     }
-    // }
 
     for (auto v : neighboring_vertices) {
         if (v == face.face.vertex(0) || v == face.face.vertex(1) || v == face.face.vertex(2)) continue;
@@ -367,13 +270,7 @@ bool is_index_two_critical_point(const Face &face, const Delaunay &dt) {
     Point pj = face.face.vertex(1)->point();
     Point pl = face.face.vertex(2)->point();
 
-    // Voronoi_face a = delaunay_face_dual(face, dt);
-    // Point out;
-    // bool debug = intersect_df_vp_d(face, a, out, dt);
-
-    bool result = dot()(Vector(pj) - pi, Vector(pl) - pi) >= 0 && dot()(Vector(pi) - pj, Vector(pl) -pj ) >= 0 && dot()(Vector(pi) - pl, Vector(pj) - pl) >= 0;
-
-    return result;
+    return dot()(Vector(pj) - pi, Vector(pl) - pi) >= 0 && dot()(Vector(pi) - pj, Vector(pl) -pj ) >= 0 && dot()(Vector(pi) - pl, Vector(pj) - pl) >= 0;
 }
 
 bool is_gabriel(const Edge &edge, const Delaunay &dt) {
@@ -403,47 +300,7 @@ bool is_gabriel(const Edge &edge, const Delaunay &dt) {
         }
     }
 
-    // for (auto vertex = dt.vertices_begin(); vertex != dt.vertices_end(); ++vertex) {
-    //     if (vertex == edge.vertex1 || vertex == edge.vertex2) continue;
-    //     if (dt.is_infinite(vertex)) continue;
-    //
-    //     FT sq_dist = squared_distance()(edge_midpoint, vertex->point());
-    //     if (sq_dist < sq_radius) {
-    //         return false;
-    //     }
-    // }
-
     return true;
-}
-
-std::vector<Delaunay::Vertex_handle> collect_gabriel_violators(const Edge &edge, const Delaunay &dt) {
-    Point p1 = edge.vertex1->point();
-    Point p2 = edge.vertex2->point();
-
-    Point edge_midpoint = midpoint()(p1, p2);
-    const FT sq_radius = squared_distance()(p1, edge_midpoint);
-
-    std::vector<Delaunay::Full_cell_handle> cell_neighbors;
-    get_incident_cells_to_edge(edge, dt, cell_neighbors);
-    std::set<Delaunay::Vertex_handle> neighboring_vertices;
-
-    for (const auto cell : cell_neighbors) {
-        for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
-            neighboring_vertices.insert(*v);
-        }
-    }
-
-    std::vector<Delaunay::Vertex_handle> violators;
-    for (auto v : neighboring_vertices) {
-        if (v == edge.vertex1 || v == edge.vertex2) continue;
-        if (dt.is_infinite(v)) continue;
-
-        FT sq_dist = squared_distance()(edge_midpoint, v->point());
-        if (sq_dist < sq_radius) {
-            violators.push_back(v);
-        }
-    }
-    return violators;
 }
 
 void get_incident_cells_to_edge(const Edge &edge, const Delaunay &dt, std::vector<Delaunay::Full_cell_handle> &cell_neighbors) {
@@ -472,38 +329,6 @@ void get_incident_cells_to_face(const Face &face, const Delaunay &dt, std::vecto
     }
 }
 
-void get_tetrahedron_normal(const std::vector<Eigen::VectorXd> &tetrahedron_points, Eigen::VectorXd &normal) {
-    const Eigen::VectorXd v1 = tetrahedron_points[1] - tetrahedron_points[0];
-    const Eigen::VectorXd v2 = tetrahedron_points[2] - tetrahedron_points[0];
-    const Eigen::VectorXd v3 = tetrahedron_points[3] - tetrahedron_points[0];
-
-    Eigen::MatrixXd A(4, 3);
-    A.col(0) = v1;
-    A.col(1) = v2;
-    A.col(2) = v3;
-
-    const Eigen::JacobiSVD<Eigen::MatrixXd> svd(A, Eigen::ComputeFullU);
-    normal = svd.matrixU().col(3);
-    normal = normal.normalized();
-}
-
-void get_facet_vertices(const Delaunay &delaunay, const Delaunay::Facet_iterator &facet,
-    std::vector<Delaunay::Vertex_handle> &facet_vertices
-    ) {
-    const int dimension = facet->full_cell()->maximal_dimension();
-    const int co_vertex_index = facet->index_of_covertex();
-
-    for (int i = 0; i <= dimension; ++i) {
-        if (i != co_vertex_index) {
-            if (const auto vertex_handle = facet->full_cell()->vertex(i);
-                vertex_handle != nullptr && !delaunay.is_infinite(vertex_handle)
-            ) {
-                facet_vertices.push_back(vertex_handle);
-            }
-        }
-    }
-}
-
 void find_gabriel_edges(Delaunay &dt, std::vector<Edge> &gabriel_edges) {
     std::unordered_set<Edge, EdgeHash> visited_edges;
     const int dim = dt.maximal_dimension();
@@ -522,34 +347,6 @@ void find_gabriel_edges(Delaunay &dt, std::vector<Edge> &gabriel_edges) {
             }
         }
     }
-}
-
-Face get_face_from_edge_and_vertex(const Edge &edge, const Delaunay::Vertex_handle &vh, const Delaunay &dt) {
-    std::vector<Delaunay::Full_cell_handle> vh_incident_cells;
-    dt.incident_full_cells(vh, std::back_inserter(vh_incident_cells));
-
-    Delaunay::Full_cell_handle new_face_full_cell;
-    for (const auto cell : vh_incident_cells) {
-        if (cell->has_vertex(edge.vertex1) && cell->has_vertex(edge.vertex2) && !dt.is_infinite(cell)) {
-            new_face_full_cell = cell;
-            break;
-        }
-    }
-
-    Delaunay::Face new_face(new_face_full_cell);
-    std::vector face_vertices = {vh, edge.vertex1, edge.vertex2};
-    std::ranges::sort(face_vertices);
-    for (int l = 0; l < 3; ++l){
-        new_face.set_index(l, new_face_full_cell->index(face_vertices[l]));
-    }
-    Face face(new_face, -1, -1);
-    for (auto vertex = new_face_full_cell->vertices_begin(); vertex != new_face_full_cell->vertices_end(); ++vertex) {
-        if (*vertex != face.face.vertex(0) && *vertex != face.face.vertex(1) && *vertex != face.face.vertex(2)) {
-            if (face.index_of_covertex_0 == -1) face.index_of_covertex_0 = new_face_full_cell->index(*vertex);
-            else if (face.index_of_covertex_1 == -1) face.index_of_covertex_1 = new_face_full_cell->index(*vertex);
-        }
-    }
-    return face;
 }
 
 std::unordered_set<Face, FaceHash> get_delaunay_faces(Delaunay &dt) {

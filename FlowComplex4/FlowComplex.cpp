@@ -2,36 +2,27 @@
 #include <polyscope/polyscope.h>
 #include <polyscope/surface_mesh.h>
 #include <polyscope/curve_network.h>
-#include <polyscope/point_cloud.h>
 
 #include "FlowComplex.h"
 #include "utils.h"
 
 bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out, const Edge &current_edge, const Point &current_center, const Delaunay &dt) {
-    // Point pi = df.face.vertex(0)->point();
-    // Point pj = df.face.vertex(1)->point();
-    // Point pl = df.face.vertex(2)->point();
     Point pi = current_edge.vertex1->point();
     Point pj = current_edge.vertex2->point();
     Point pl = current_center;
 
-    std::vector v_debug = {pi, pj, pl};
-
     const int nv = static_cast<int>(vp.voronoi_vertices.size());
-    int b0 = -1;
-    int b1 = -1;
-    int b2 = -1;
+
+    int b0 = -1, b1 = -1, b2 = -1;
     for (int i = 0; i < nv; ++i) {
-        if (b0 == -1) {
-            b0 = i;
-        }
-        else if (b1 == -1) {b1 = i;}
+        if (b0 == -1) b0 = i;
+        else if (b1 == -1) b1 = i;
         else { b2 = i; break; }
     }
 
     LA_Matrix M(4,4);
     for (int k = 0; k < 4; ++k) {
-        auto row = M.row_begin(k);
+        LA_Matrix::row_iterator row = M.row_begin(k);
         *row++ = pj[k] - pi[k];
         *row++ = pl[k] - pi[k];
         *row++ = -(vp.voronoi_vertices[b1].point[k] - vp.voronoi_vertices[b0].point[k]);
@@ -47,7 +38,8 @@ bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out, const Edge &c
     FT D;
     LA::linear_solver(M, b, x, D);
 
-    FT s = x[0]/D, t = x[1]/D;
+    const FT s = x[0]/D;
+    const FT t = x[1]/D;
 
     Vector pjpi = (Vector(pj) - pi);
     Vector spjpi = Vector(s * pjpi[0], s * pjpi[1], s * pjpi[2], s * pjpi[3]);
@@ -76,52 +68,37 @@ bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out, const Edge &c
             neighboring_vertices.insert(*v);
         }
     }
-    FT sq_dist_out_dual = squared_distance()(out, current_edge.vertex1->point());
+    const FT sq_dist_out_dual = squared_distance()(out, current_edge.vertex1->point());
     for (Delaunay::Vertex_handle v :neighboring_vertices) {
         if (v == current_edge.vertex1 || v == current_edge.vertex2 || v == dual_point) continue;
-        FT sq_dist_out_neighbor = squared_distance()(out, v->point());
-        if (sq_dist_out_neighbor < sq_dist_out_dual) {
+        if (FT sq_dist_out_neighbor = squared_distance()(out, v->point()); sq_dist_out_neighbor < sq_dist_out_dual) {
             return false;
         }
     }
 
     return true;
-
-    // Voronoi_vertex v_vertex_base = vp.voronoi_vertices.front();
-    // auto v_vertex_it = vp.voronoi_vertices.begin();
-    // while (v_vertex_base.is_infinite) {
-    //     v_vertex_base = *(++v_vertex_it);
-    // }
-    // LA_Vector v_0(v_vertex_base.point.cartesian_begin(), v_vertex_base.point.cartesian_end());
-    //
-    // for (int i = 0; i < vp.voronoi_vertices.size(); ++i) {
-    //     if (vp.voronoi_vertices[i] == v_vertex_base) continue;
-    //     int next = (i + 1) % vp.voronoi_vertices.size();
-    //     if (vp.voronoi_vertices[next] == v_vertex_base) continue;
-    //     LA_Vector v_1(vp.voronoi_vertices[i].point.cartesian_begin(), vp.voronoi_vertices[i].point.cartesian_end());
-    //     LA_Vector v_2(vp.voronoi_vertices[next].point.cartesian_begin(), vp.voronoi_vertices[next].point.cartesian_end());
-    //     std::vector matrix_cols = {v_1 - v_0, v_2 - v_0};
-    //
-    //     LA_Matrix M_P(matrix_cols.begin(), matrix_cols.end());
-    //     LA_Vector b_P(4);
-    //     auto c = b_P.begin();
-    //     for (int k = 0; k < 4; ++k) {
-    //         *c++ = out[k] - v_0[k];
-    //     }
-    //     LA_Vector x_p(4);
-    //     FT D_p;
-    //
-    //     bool test = LA::linear_solver(M_P, b_P, x_p, D_p);
-    //     if (!test) std::cout << "Error" << std::endl;
-    //
-    //     if (x_p[0]/D >= FT(0) && x_p[1]/D >= FT(0) && x_p[0]/D + x_p[1]/D <= FT(1)) {
-    //         return true;
-    //     }
-    // }
-    //
-    // return false;
 }
 
+void index_constructed_vertex(const std::array<double, 4> &constructed_vertex, std::map<std::array<double, 4>, size_t> &map, int &total_count) {
+    if (const auto already_indexed = map.find(constructed_vertex); already_indexed == map.end()) {
+        map[constructed_vertex] = total_count++;
+    }
+}
+
+std::array<size_t, 3> make_fc_face_gabriel(
+    const Delaunay::Vertex_handle e1,
+    const Delaunay::Vertex_handle e2,
+    const std::array<double, 4> &center,
+    std::map<Delaunay::Vertex_handle, size_t> delaunay_map,
+    std::map<std::array<double, 4>, size_t> constructed_map
+) {
+    std::array<size_t, 3> fc_face{};
+    fc_face[0] = delaunay_map[e1];
+    fc_face[1] = delaunay_map[e2];
+    fc_face[2] = constructed_map[center];
+
+    return fc_face;
+}
 bool intersect_ray_vp(const Face &df, Voronoi_face &vp, Point &out, const Edge &current_edge, const Point &current_center, const Delaunay &dt) {
     // Point pi = df.face.vertex(0)->point();
     // Point pj = df.face.vertex(1)->point();
@@ -203,164 +180,103 @@ bool intersect_ray_vp(const Face &df, Voronoi_face &vp, Point &out, const Edge &
     return true;
 }
 
-void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, std::vector<std::array<size_t, 3>> &faces, std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index) {
-    std::map<std::array<double, 4>, size_t> fc_vertex_to_index;
-    int vertex_count = static_cast<int>(vertices.size());
-    std::vector<Eigen::VectorXd> index_two_points;
-    std::vector<std::array<size_t, 3>> non_gabriel_faces;
-    std::vector<std::array<size_t, 2>> gabriel_edges;
-    std::vector<Eigen::VectorXd> V_projected = stereo_projection(vertices);
-    int missed_intersections = 0;
-    int mulitple = 0;
+std::array<size_t, 3> make_fc_face_non_gabriel(
+    const Delaunay::Vertex_handle e,
+    const std::array<double, 4> &center,
+    const std::array<double, 4> &s_prime,
+    std::map<Delaunay::Vertex_handle, size_t> delaunay_map,
+    std::map<std::array<double, 4>, size_t> constructed_map
+) {
+    std::array<size_t, 3> fc_face{};
+    fc_face[0] = delaunay_map[e];
+    fc_face[1] = constructed_map[s_prime];
+    fc_face[2] = constructed_map[center];
 
-    for (auto delaunay_faces = get_delaunay_faces(delaunay); const auto & delaunay_face : delaunay_faces) {
-        if (!delaunay.is_infinite(delaunay_face.face)) {
-            if (is_index_two_critical_point(delaunay_face, delaunay)) {
-                std::queue<std::tuple<Point, Edge, Face>> edge_queue;
+    return fc_face;
+}
 
-                std::vector cgal_points = {delaunay_face.face.vertex(0)->point(), delaunay_face.face.vertex(1)->point(), delaunay_face.face.vertex(2)->point()};
-                Point cgal_center = circumcenter()(cgal_points.begin(), cgal_points.end());
+void index_two_stable_manifold(const Delaunay &dt, const Face &starting_face, std::vector<std::array<size_t, 3>> &faces, helper_data &data) {
+    std::queue<std::tuple<Point, Edge, Face>> edge_queue;
+    std::vector<Edge> boundary;
 
-                edge_queue.emplace(cgal_center, Edge(delaunay_face.face.vertex(0), delaunay_face.face.vertex(1), delaunay_face.face.vertex(2)), delaunay_face);
-                edge_queue.emplace(cgal_center, Edge(delaunay_face.face.vertex(0), delaunay_face.face.vertex(2), delaunay_face.face.vertex(1)), delaunay_face);
-                edge_queue.emplace(cgal_center, Edge(delaunay_face.face.vertex(1), delaunay_face.face.vertex(2), delaunay_face.face.vertex(0)), delaunay_face);
+    std::vector cgal_points = {starting_face.face.vertex(0)->point(), starting_face.face.vertex(1)->point(), starting_face.face.vertex(2)->point()};
+    Point cgal_center = circumcenter()(cgal_points.begin(), cgal_points.end());
 
-                while (!edge_queue.empty()) {
-                    std::tuple<Point, Edge, Face> current = edge_queue.front();
-                    edge_queue.pop();
-                    Point current_center = std::get<0>(current);
-                    Edge current_edge = std::get<1>(current);
-                    Face current_delaunay_face = std::get<2>(current);
-                    if (is_gabriel(current_edge, delaunay)) {
-                        std::array fc_center = {CGAL::to_double(current_center[0]), CGAL::to_double(current_center[1]), CGAL::to_double(current_center[2]), CGAL::to_double(current_center[3])};
-                        auto fc_index = fc_vertex_to_index.find(fc_center);
-                        std::array<size_t, 3> fc_face{};
-                        if (fc_index == fc_vertex_to_index.end()) {
-                            fc_vertex_to_index[fc_center] = vertex_count++;
-                        }
-                        fc_face[0] = vertex_to_index[current_edge.vertex1];
-                        fc_face[1] = vertex_to_index[current_edge.vertex2];
-                        fc_face[2] = fc_vertex_to_index[fc_center];
-                        faces.push_back(fc_face);
-                        gabriel_edges.push_back({vertex_to_index[current_edge.vertex1], vertex_to_index[current_edge.vertex2]});
-                    }
-                    else {
-                        std::vector triangle_vertices = {current_delaunay_face.face.vertex(0)->point(), current_delaunay_face.face.vertex(1)->point(), current_delaunay_face.face.vertex(2)->point()};
+    edge_queue.emplace(cgal_center, Edge(starting_face.face.vertex(0), starting_face.face.vertex(1), starting_face.face.vertex(2)), starting_face);
+    edge_queue.emplace(cgal_center, Edge(starting_face.face.vertex(0), starting_face.face.vertex(2), starting_face.face.vertex(1)), starting_face);
+    edge_queue.emplace(cgal_center, Edge(starting_face.face.vertex(1), starting_face.face.vertex(2), starting_face.face.vertex(0)), starting_face);
 
-                        std::vector<Delaunay::Full_cell_handle> neighboring_cells;
+    while (!edge_queue.empty()) {
+        std::tuple<Point, Edge, Face> current = edge_queue.front();
+        edge_queue.pop();
+        Point current_center = std::get<0>(current);
+        Edge current_edge = std::get<1>(current);
+        Face current_delaunay_face = std::get<2>(current);
 
-                        Point edge_mid = midpoint()(current_edge.vertex1->point(), current_edge.vertex2->point());
+        if (is_gabriel(current_edge, dt)) {
+            std::array center_converted = {CGAL::to_double(current_center[0]), CGAL::to_double(current_center[1]), CGAL::to_double(current_center[2]), CGAL::to_double(current_center[3])};
+            index_constructed_vertex(center_converted, data.fc_vertex_to_index, data.vertex_count);
 
-                        std::vector<std::pair<Point, Face>> next;
+            std::array<size_t, 3> fc_face = make_fc_face_gabriel(current_edge.vertex1, current_edge.vertex2, center_converted, data.vertex_to_index, data.fc_vertex_to_index);
 
-                        Voronoi_face current_voronoi_face = delaunay_face_dual(current_delaunay_face, delaunay);
+            faces.push_back(fc_face);
+            data.gabriel_edges.push_back({data.vertex_to_index[current_edge.vertex1], data.vertex_to_index[current_edge.vertex2]});
+            boundary.push_back(current_edge);
+        }
+        else {
+            Point edge_mid = midpoint()(current_edge.vertex1->point(), current_edge.vertex2->point());
 
-                        std::vector<Voronoi_face> voronoi_faces = delaunay_edge_dual(current_edge, current_delaunay_face, delaunay);
+            Voronoi_face current_voronoi_face = delaunay_face_dual(current_delaunay_face, dt);
+            std::vector<Voronoi_face> voronoi_faces = delaunay_edge_dual(current_edge, current_delaunay_face, dt);
 
-                        bool intersected = false;
-                        std::vector line_debug = {current_center, edge_mid};
-                        std::vector<std::pair<Point, Face>> intersections;
-                        Point cc = circumcenter()(triangle_vertices.begin(), triangle_vertices.end());
-                        int count_dist = 0;
-                        for (auto v_face : voronoi_faces) {
-                            Point out;
-                            bool test_intersect = intersect_ray_vp(current_delaunay_face, v_face, out, current_edge, current_center, delaunay);
-                            if (test_intersect) {
-                                intersected = true;
-                                next.push_back({out, v_face.dual});
-                            }
-                            intersections.push_back({out, v_face.dual});
-                        }
-                        // Point dual_point;
-                        // for (int i = 0; i < 3; i++) {
-                        //     if (next.begin()->second.face.vertex(i) != current_edge.vertex1 && next.begin()->second.face.vertex(i) != current_edge.vertex2) {
-                        //         dual_point = next.begin()->second.face.vertex(i)->point();
-                        //     }
-                        // }
-                        // std::vector<Delaunay::Full_cell_handle> cell_neighbors;
-                        // get_incident_cells_to_edge(current_edge, delaunay, cell_neighbors);
-                        // std::set<Delaunay::Vertex_handle> neighboring_vertices;
-                        //
-                        // for (const auto cell : cell_neighbors) {
-                        //     for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
-                        //         neighboring_vertices.insert(*v);
-                        //     }
-                        // }
-                        // FT sq_dist_out_dual = squared_distance()(next.begin()->first, dual_point);
-                        // for (Delaunay::Vertex_handle v : neighboring_vertices) {
-                        //     FT sq_dist_out_neighbor = squared_distance()(next.begin()->first, v->point());
-                        //     if (sq_dist_out_neighbor < sq_dist_out_dual) {
-                        //         test_dist = false;
-                        //     }
-                        // }
-                        // if (test_dist) {
-                        //     count_dist++;
-                        // }
-
-                        if (!intersected) {
-                            missed_intersections++;
-                            // std::vector<Delaunay::Vertex_handle> gabriel_violators = collect_gabriel_violators(current_edge, delaunay);
-                            // std::vector new_line = {cc, edge_mid};
-                            // std::vector<std::pair<Point, Face>> intersections_fallback;
-                            // for (Delaunay::Vertex_handle gv : gabriel_violators) {
-                            //     Face gv_delaunay_face = get_face_from_edge_and_vertex(current_edge, gv, delaunay);
-                            //     Voronoi_face gv_voronoi_face = delaunay_face_dual(gv_delaunay_face, delaunay);
-                            //     Point gv_out;
-                            //     intersect_df_vp(current_delaunay_face, gv_voronoi_face, gv_out);
-                            //     intersections_fallback.push_back({gv_out, gv_delaunay_face});
-                            //     // if (!contained_in_affine_hull()(new_line.begin(), new_line.end(), gv_out)) {
-                            //     //     std::cout << "Not contained" << std::endl;
-                            //     // }
-                            // }
-                        }
-                        if (next.size() > 1) {
-                            // std::cout << "Multiple intersections" << std::endl;
-                            // for (auto [s_prime, next_face] : next) {
-                            //     std::cout << s_prime << std::endl;
-                            // }
-                            mulitple++;
-                        }
-
-                        for (const auto& [s_prime, next_face]: next) {
-                            std::array<size_t, 3> fc_face1{}, fc_face2{};
-                            std::array fc_center = {CGAL::to_double(current_center[0]), CGAL::to_double(current_center[1]), CGAL::to_double(current_center[2]), CGAL::to_double(current_center[3])};
-                            std::array fc_s_prime = {CGAL::to_double(s_prime[0]), CGAL::to_double(s_prime[1]), CGAL::to_double(s_prime[2]), CGAL::to_double(s_prime[3])};
-                            if (auto fc_index = fc_vertex_to_index.find(fc_center); fc_index == fc_vertex_to_index.end()) {
-                                fc_vertex_to_index[fc_center] = vertex_count++;
-                            }
-                            if (auto fc_s_prime_index = fc_vertex_to_index.find(fc_s_prime); fc_s_prime_index == fc_vertex_to_index.end()) {
-                                fc_vertex_to_index[fc_s_prime] = vertex_count++;
-                            }
-                            fc_face1[0] = vertex_to_index[current_edge.vertex1];
-                            fc_face1[1] = fc_vertex_to_index[fc_s_prime];
-                            fc_face1[2] = fc_vertex_to_index[fc_center];
-                            fc_face2[0] = vertex_to_index[current_edge.vertex2];
-                            fc_face2[1] = fc_vertex_to_index[fc_s_prime];
-                            fc_face2[2] = fc_vertex_to_index[fc_center];
-                            faces.push_back(fc_face1);
-                            faces.push_back(fc_face2);
-
-                            for (int i = 0; i <= next_face.face.face_dimension(); i++) {
-                                Edge next_edge(next_face.face.vertex(i), next_face.face.vertex((i + 1)%3), next_face.face.vertex((i + 2)%3));
-                                if (next_edge == current_edge) {
-                                    continue;
-                                }
-                                edge_queue.emplace(s_prime, next_edge, next_face);
-                            }
-                        }
-                    }
+            Point s_prime;
+            std::optional<Face> next_face;
+            for (Voronoi_face v_face : voronoi_faces) {
+                if (Point out; intersect_df_vp(current_delaunay_face, v_face, out, current_edge, current_center, dt)) {
+                    s_prime = out;
+                    next_face = v_face.dual;
                 }
+            }
+
+            std::array fc_center = {CGAL::to_double(current_center[0]), CGAL::to_double(current_center[1]), CGAL::to_double(current_center[2]), CGAL::to_double(current_center[3])};
+            std::array fc_s_prime = {CGAL::to_double(s_prime[0]), CGAL::to_double(s_prime[1]), CGAL::to_double(s_prime[2]), CGAL::to_double(s_prime[3])};
+
+            index_constructed_vertex(fc_center, data.fc_vertex_to_index, data.vertex_count);
+            index_constructed_vertex(fc_s_prime, data.fc_vertex_to_index, data.vertex_count);
+
+            std::array<size_t, 3> fc_face1 = make_fc_face_non_gabriel(current_edge.vertex1, fc_center, fc_s_prime, data.vertex_to_index, data.fc_vertex_to_index);
+            std::array<size_t, 3> fc_face2 = make_fc_face_non_gabriel(current_edge.vertex2, fc_center, fc_s_prime, data.vertex_to_index, data.fc_vertex_to_index);
+
+            faces.push_back(fc_face1);
+            faces.push_back(fc_face2);
+
+            for (int i = 0; i <= next_face->face.face_dimension(); i++) {
+                Edge next_edge(next_face->face.vertex(i), next_face->face.vertex((i + 1)%3), next_face->face.vertex((i + 2)%3));
+                if (next_edge == current_edge) {
+                    continue;
+                }
+                edge_queue.emplace(s_prime, next_edge, *next_face);
             }
         }
     }
-    vertices.resize(vertex_count);
-    for (auto [vertex, index] : fc_vertex_to_index) {
+    Saddle_2 saddle_2(starting_face, delaunay_face_dual(starting_face, dt));
+    stable_manifold_2 sm(boundary, saddle_2);
+    data.sm.push_back(sm);
+}
+
+void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, std::vector<std::array<size_t, 3>> &faces, helper_data &data) {
+    const std::vector<Eigen::VectorXd> V_projected = stereo_projection(vertices);
+
+    for (const std::unordered_set<Face, FaceHash> delaunay_faces = get_delaunay_faces(delaunay); const Face &delaunay_face : delaunay_faces) {
+        if (is_index_two_critical_point(delaunay_face, delaunay)) {
+            index_two_stable_manifold(delaunay, delaunay_face, faces, data);
+        }
+    }
+    vertices.resize(data.vertex_count);
+    for (auto [vertex, index] : data.fc_vertex_to_index) {
         Eigen::VectorXd new_vertex(delaunay.maximal_dimension());
         new_vertex << vertex[0], vertex[1], vertex[2], vertex[3];
         vertices[index] = new_vertex;
     }
-    polyscope::registerCurveNetwork("Gabriel edges", V_projected, gabriel_edges);
-    //polyscope::registerSurfaceMesh("non-gabriel", vertices, non_gabriel_faces);
-    std::cout << "Missed intersections: " << missed_intersections << std::endl;
-    std::cout << "Multiple intersections: " << mulitple << std::endl;
+    polyscope::registerCurveNetwork("Gabriel edges", V_projected, data.gabriel_edges);
 }

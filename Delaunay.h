@@ -17,6 +17,9 @@ typedef K::Construct_circumcenter_d circumcenter;
 typedef K::Squared_distance_d squared_distance;
 typedef K::Contained_in_simplex_d contained_in_simplex;
 typedef K::Scalar_product_d dot;
+typedef CGAL::Linear_algebraCd<FT> LA;
+typedef LA::Matrix LA_Matrix;
+typedef LA::Vector LA_Vector;
 
 struct Edge {
     Delaunay::Vertex_handle vertex1;

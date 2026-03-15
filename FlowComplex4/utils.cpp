@@ -1,5 +1,3 @@
-#include <random>
-
 #include "utils.h"
 #include "Delaunay.h"
 #include "polyscope/point_cloud.h"
@@ -8,31 +6,6 @@
 #include "igl/writeOBJ.h"
 #include "igl/readPLY.h"
 #include "igl/readOBJ.h"
-
-Eigen::MatrixXd cliffordgen(int nsamples) {
-    std::random_device rd{};
-    std::mt19937 gen{ rd() };
-    const double radius = 1 / sqrt(2);
-
-    std::uniform_real_distribution<> angle_t{ 0, 2 * M_PI }, angle_p{ 0, 2 * M_PI };
-    std::uniform_real_distribution<> noise{ -0.0001, 0.0001};
-
-    Eigen::MatrixXd samples(nsamples, 4);
-
-    for (int i = 0; i < nsamples; i++) {
-        double p = angle_t(gen);
-        double q = angle_p(gen);
-
-        double a = 1;
-        double b = 1 /*+ noise(gen)*/;
-
-        auto sample = Eigen::Vector4d(a * cos(p), a * sin(p), b * cos(q), b * sin(q));
-        sample *= radius;
-
-        samples.row(i) = sample.transpose();
-    }
-    return samples;
-}
 
 Eigen::MatrixXd stereo_projection(Eigen::MatrixXd object) {
     double l = 1;

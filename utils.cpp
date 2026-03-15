@@ -204,3 +204,17 @@ bool intersect_segment_ray(std::pair<Eigen::VectorXd, Eigen::VectorXd> ray, std:
     }
     return false;
 }
+
+bool intersect_segment_ray(Point origin, Point through, Point e1, Point e2, Point out) {
+    Vector ray_direction = Vector(through) - origin;
+    Vector segment_direction = Vector(e2) - e1;
+
+    LA::Matrix M(2,3);
+
+    for (int i = 0; i < 2; i++) {
+        auto row = M.row_begin(i);
+    }
+
+
+    return false;
+}
