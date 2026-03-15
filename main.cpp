@@ -59,7 +59,7 @@ int main() {
         Eigen::Matrix<double, Eigen::Dynamic, 3> T;
 
         // Eigen::Matrix<double, Eigen::Dynamic, 3> V;
-        // generate_trefoil(1000, 3, V, N1, N2, T);
+        // generate_trefoil(10000, 3, V, N1, N2, T);
         std::string filename = testfile + std::to_string(n);
         // std::string filepath = "../" + filename + ".ply";
         //std::string filepath = "../output/happy_vrip_res1000000_1000000_20260204_213045.obj";
@@ -69,14 +69,13 @@ int main() {
         //read_obj(filepath, V, F);
         std::vector<Delaunay::Point> points;
         //gen_sphere_sample(10000, 1, points);
+        //generate_torus(1000, 0.5, 1, points);
 
 
         Eigen::MatrixXd B;
         Eigen::MatrixXi FI;
         Eigen::MatrixXd X;
         //igl::random_points_on_mesh(n, V, F, B, FI, X);
-
-        std::cout << "randomized" << std::endl;
 
         Delaunay delaunay3D(3);
 
@@ -98,6 +97,7 @@ int main() {
         std::cout << "Vertices: " << points.size() << std::endl;
 
         polyscope::init();
+        polyscope::options::groundPlaneMode = polyscope::GroundPlaneMode::None;
 
         std::vector<Eigen::VectorXd> vertices;
         std::vector<std::array<size_t, 3> > faces;
@@ -108,6 +108,7 @@ int main() {
         write_faces_to_vector(delaunay3D, faces, vertex_to_index);
         //auto *psMesh = polyscope::registerSurfaceMesh("delaunay mesh", vertices, faces);
         auto *pcCloud = polyscope::registerPointCloud("delaunay vertices", vertices);
+
 
         std::vector<Eigen::VectorXd> reconstructed_vertices = vertices;
         auto time_start = std::chrono::high_resolution_clock::now();

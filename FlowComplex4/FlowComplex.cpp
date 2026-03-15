@@ -18,11 +18,14 @@ bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out, const Edge &c
     std::vector v_debug = {pi, pj, pl};
 
     const int nv = static_cast<int>(vp.voronoi_vertices.size());
-
-    int b0 = -1, b1 = -1, b2 = -1;
+    int b0 = -1;
+    int b1 = -1;
+    int b2 = -1;
     for (int i = 0; i < nv; ++i) {
-        if (b0 == -1) b0 = i;
-        else if (b1 == -1) b1 = i;
+        if (b0 == -1) {
+            b0 = i;
+        }
+        else if (b1 == -1) {b1 = i;}
         else { b2 = i; break; }
     }
 
@@ -119,6 +122,87 @@ bool intersect_df_vp(const Face &df, Voronoi_face &vp, Point &out, const Edge &c
     // return false;
 }
 
+bool intersect_ray_vp(const Face &df, Voronoi_face &vp, Point &out, const Edge &current_edge, const Point &current_center, const Delaunay &dt) {
+    // Point pi = df.face.vertex(0)->point();
+    // Point pj = df.face.vertex(1)->point();
+    // Point pl = df.face.vertex(2)->point();
+    Point pi = current_edge.vertex1->point();
+    Point pj = current_edge.vertex2->point();
+    Point pl = current_center;
+
+    Point driver = midpoint()(current_edge.vertex1->point(), current_edge.vertex2->point());
+    Vector ray_dir = Vector(current_center) - driver;
+
+    std::vector v_debug = {pi, pj, pl};
+
+    const int nv = static_cast<int>(vp.voronoi_vertices.size());
+    int b0 = -1;
+    int b1 = -1;
+    int b2 = -1;
+    for (int i = 0; i < nv; ++i) {
+        if (b0 == -1) {
+            b0 = i;
+        }
+        else if (b1 == -1) {b1 = i;}
+        else { b2 = i; break; }
+    }
+
+    LA_Matrix M(3,4);
+    for (int k = 0; k < 3; ++k) {
+        auto row = M.row_begin(k);
+        *row++ = ray_dir[k];
+        *row++ = -(vp.voronoi_vertices[b1].point[k] - vp.voronoi_vertices[b0].point[k]);
+        *row = -(vp.voronoi_vertices[b2].point[k] - vp.voronoi_vertices[b0].point[k]);
+    }
+    LA_Vector b(4);
+    auto coord = b.begin();
+    for (int k = 0; k < 4; ++k) {
+        *coord++ = vp.voronoi_vertices[b0].point[k] - driver[k];
+    }
+
+    LA_Vector x(4);
+    FT D;
+    LA::linear_solver(M, b, x, D);
+
+    FT s = x[0]/D, t = x[1]/D;
+
+    Vector s_driver_dir = Vector(s * ray_dir[0], s * ray_dir[1], s * ray_dir[2], s * ray_dir[3]);
+
+    Vector p_int = driver + s_driver_dir;
+    out = p_int;
+
+    // Triangle containment: s >= 0, t >= 0, s + t <= 1
+    if (!(s >= FT(0) && s <= FT(1))) {
+        return false;
+    }
+
+    Delaunay::Vertex_handle dual_point;
+    for (int i = 0; i < 3; i++) {
+        if (vp.dual.face.vertex(i) != current_edge.vertex1 && vp.dual.face.vertex(i) != current_edge.vertex2) {
+            dual_point = vp.dual.face.vertex(i);
+        }
+    }
+    std::vector<Delaunay::Full_cell_handle> cell_neighbors;
+    get_incident_cells_to_edge(current_edge, dt, cell_neighbors);
+    std::set<Delaunay::Vertex_handle> neighboring_vertices;
+
+    for (const auto cell : cell_neighbors) {
+        for (auto v = cell->vertices_begin(); v != cell->vertices_end(); ++v) {
+            neighboring_vertices.insert(*v);
+        }
+    }
+    FT sq_dist_out_dual = squared_distance()(out, current_edge.vertex1->point());
+    for (Delaunay::Vertex_handle v :neighboring_vertices) {
+        if (v == current_edge.vertex1 || v == current_edge.vertex2 || v == dual_point) continue;
+        FT sq_dist_out_neighbor = squared_distance()(out, v->point());
+        if (sq_dist_out_neighbor < sq_dist_out_dual) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
 void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, std::vector<std::array<size_t, 3>> &faces, std::map<Delaunay::Vertex_handle, size_t> &vertex_to_index) {
     std::map<std::array<double, 4>, size_t> fc_vertex_to_index;
     int vertex_count = static_cast<int>(vertices.size());
@@ -180,7 +264,7 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                         int count_dist = 0;
                         for (auto v_face : voronoi_faces) {
                             Point out;
-                            bool test_intersect = intersect_df_vp(current_delaunay_face, v_face, out, current_edge, current_center, delaunay);
+                            bool test_intersect = intersect_ray_vp(current_delaunay_face, v_face, out, current_edge, current_center, delaunay);
                             if (test_intersect) {
                                 intersected = true;
                                 next.push_back({out, v_face.dual});

@@ -28,17 +28,17 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
             }
             Face face(face_no_co_vertex, facet->index_of_covertex());
             delaunay_faces.push_back({vertex_to_index[face.face.vertex(0)], vertex_to_index[face.face.vertex((1))], vertex_to_index[face.face.vertex((2))]});
-            int debug = 5991;
-            if (vertex_to_index[face.face.vertex(0)] == debug || vertex_to_index[face.face.vertex(1)] == debug || vertex_to_index[face.face.vertex(2)] == debug) {
-                std::vector face_vertices = {face.face.vertex(0)->point(), face.face.vertex(1)->point(), face.face.vertex(2)->point()};
-                circumcenters.push_back(make_point_eigen(circumcenter()(face_vertices.begin(), face_vertices.end())));
-                std::vector<Eigen::VectorXd> vv;
-                auto current_voronoi_edge = delaunay_face_dual(face, delaunay);
-                vv.push_back(current_voronoi_edge.vertex1.point);
-                vv.push_back(current_voronoi_edge.vertex2.point);
-                std::vector<std::array<size_t, 2>> ve = {{0, 1}};
-                //polyscope::registerCurveNetwork(std::to_string(count++), vv, ve);
-            }
+            // int debug = 5991;
+            // if (vertex_to_index[face.face.vertex(0)] == debug || vertex_to_index[face.face.vertex(1)] == debug || vertex_to_index[face.face.vertex(2)] == debug) {
+            //     std::vector face_vertices = {face.face.vertex(0)->point(), face.face.vertex(1)->point(), face.face.vertex(2)->point()};
+            //     circumcenters.push_back(make_point_eigen(circumcenter()(face_vertices.begin(), face_vertices.end())));
+            //     std::vector<Eigen::VectorXd> vv;
+            //     auto current_voronoi_edge = delaunay_face_dual(face, delaunay);
+            //     vv.push_back(current_voronoi_edge.vertex1.point);
+            //     vv.push_back(current_voronoi_edge.vertex2.point);
+            //     std::vector<std::array<size_t, 2>> ve = {{0, 1}};
+            //     //polyscope::registerCurveNetwork(std::to_string(count++), vv, ve);
+            // }
             if (is_index_two_critical_point(face, delaunay)) {
                 std::vector<std::array<size_t, 3>> stable_manifold;
                 std::queue<std::tuple<Eigen::VectorXd, Edge, Face>> edge_queue;
@@ -112,23 +112,6 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                                 faces.push_back(fc_face2);
                                 non_gabriel_faces.push_back(fc_face1);
                                 non_gabriel_faces.push_back(fc_face2);
-
-                                Delaunay::Vertex_handle new_v;
-                                for (int i = 0; i < 3; i++) {
-                                    if (dual_delaunay_face.face.vertex(i) != current_edge.vertex1 && dual_delaunay_face.face.vertex(i) != current_edge.vertex2) {
-                                        new_v = dual_delaunay_face.face.vertex(i);
-                                        break;
-                                    }
-                                }
-                                if (violators.size() > 1) {
-                                    for (auto v: violators) {
-                                        std::cout << v.first->point() << std::endl;
-                                        std::cout << v.second << std::endl;
-                                        if (new_v == v.first) std::cout << "new_v" << std::endl;
-
-                                    }
-                                    std::cout << "-----" << std::endl;
-                                }
                             }
                         }
 
