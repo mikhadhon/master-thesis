@@ -20,6 +20,5 @@ struct helper_data {
     std::vector<stable_manifold_2> sm;
 };
 
-
 void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, std::vector<std::array<size_t, 3>> &faces, helper_data &data);
 #endif
