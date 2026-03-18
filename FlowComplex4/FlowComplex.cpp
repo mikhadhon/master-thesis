@@ -206,6 +206,8 @@ void index_two_stable_manifold(const Delaunay &dt, const Face &starting_face, st
     edge_queue.emplace(cgal_center, Edge(starting_face.face.vertex(0), starting_face.face.vertex(2), starting_face.face.vertex(1)), starting_face);
     edge_queue.emplace(cgal_center, Edge(starting_face.face.vertex(1), starting_face.face.vertex(2), starting_face.face.vertex(0)), starting_face);
 
+    std::vector<std::array<size_t, 3>> sm_faces;
+
     while (!edge_queue.empty()) {
         std::tuple<Point, Edge, Face> current = edge_queue.front();
         edge_queue.pop();
@@ -220,8 +222,15 @@ void index_two_stable_manifold(const Delaunay &dt, const Face &starting_face, st
             std::array<size_t, 3> fc_face = make_fc_face_gabriel(current_edge.vertex1, current_edge.vertex2, center_converted, data.vertex_to_index, data.fc_vertex_to_index);
 
             faces.push_back(fc_face);
+            sm_faces.push_back(fc_face);
             data.gabriel_edges.push_back({data.vertex_to_index[current_edge.vertex1], data.vertex_to_index[current_edge.vertex2]});
             boundary.push_back(current_edge);
+            if (!data.gabriel_topology.contains(current_edge)) {
+                data.gabriel_topology[current_edge] = 1;
+            }
+            else {
+                data.gabriel_topology[current_edge]++;
+            }
         }
         else {
             Point edge_mid = midpoint()(current_edge.vertex1->point(), current_edge.vertex2->point());
@@ -235,6 +244,7 @@ void index_two_stable_manifold(const Delaunay &dt, const Face &starting_face, st
                 if (Point out; intersect_df_vp(current_delaunay_face, v_face, out, current_edge, current_center, dt)) {
                     s_prime = out;
                     next_face = v_face.dual;
+                    break;
                 }
             }
 
@@ -249,6 +259,8 @@ void index_two_stable_manifold(const Delaunay &dt, const Face &starting_face, st
 
             faces.push_back(fc_face1);
             faces.push_back(fc_face2);
+            sm_faces.push_back(fc_face1);
+            sm_faces.push_back(fc_face2);
 
             for (int i = 0; i <= next_face->face.face_dimension(); i++) {
                 Edge next_edge(next_face->face.vertex(i), next_face->face.vertex((i + 1)%3), next_face->face.vertex((i + 2)%3));
@@ -260,8 +272,17 @@ void index_two_stable_manifold(const Delaunay &dt, const Face &starting_face, st
         }
     }
     Saddle_2 saddle_2(starting_face, delaunay_face_dual(starting_face, dt));
-    stable_manifold_2 sm(boundary, saddle_2);
-    data.sm.push_back(sm);
+    stable_manifold_2 sm(boundary, saddle_2, sm_faces);
+    data.stable_manifolds.push_back(sm);
+
+    Voronoi_face triangle_dual = delaunay_face_dual(starting_face, dt);
+    FT distance_saddle = squared_distance()(cgal_center, starting_face.face.vertex(0)->point());
+    for (Voronoi_vertex v : triangle_dual.voronoi_vertices) {
+        FT distance_voronoi = v.is_infinite ? FT(std::numeric_limits<double>::max()) : squared_distance()(v.point, starting_face.face.vertex(0)->point());
+        FT distance_heuristic = distance_voronoi - distance_saddle;
+
+        data.valid_pairs.push_back(valid_pair(sm, v, CGAL::abs(distance_heuristic)));
+    }
 }
 
 void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, std::vector<std::array<size_t, 3>> &faces, helper_data &data) {
@@ -279,4 +300,85 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
         vertices[index] = new_vertex;
     }
     polyscope::registerCurveNetwork("Gabriel edges", V_projected, data.gabriel_edges);
+}
+
+void reduce_flow_complex(Delaunay &dt, helper_data &data) {
+    std::sort(data.valid_pairs.begin(), data.valid_pairs.end());
+
+    while (true) {
+        // Step 5: Find the valid pair with minimum distance that fulfills the topology constraint
+        auto best_it = std::find_if(data.valid_pairs.begin(), data.valid_pairs.end(),
+            [&](const valid_pair &vp) {
+                return std::any_of(vp.sm.gabriel_edges.begin(), vp.sm.gabriel_edges.end(),
+                    [&](const Edge &e) { return data.gabriel_topology[e] > 2; });
+            });
+
+        if (best_it == data.valid_pairs.end())
+            break;
+
+        valid_pair selected = *best_it;
+        const Voronoi_vertex &b = selected.v;
+
+        // Step 7: Collect all other maxima paired with saddle a (all voronoi vertices except b)
+        std::vector<Voronoi_vertex> other_maxima;
+        for (const auto &v : selected.sm.saddle_2.dual.voronoi_vertices) {
+            if (!(v == b))
+                other_maxima.push_back(v);
+        }
+
+        // Step 6: Remove stable manifold of a from F
+        auto sm_it = std::find(data.stable_manifolds.begin(), data.stable_manifolds.end(), selected.sm);
+        if (sm_it != data.stable_manifolds.end()) {
+            data.stable_manifolds.erase(sm_it);
+        }
+
+        // Update gabriel_topology: a's boundary is removed
+        for (const Edge &e : selected.sm.gabriel_edges) {
+            data.gabriel_topology[e]--;
+        }
+
+        // Remove all of saddle a's own pairs from V (a is removed from F)
+        // and update pairs for other saddles paired with b
+        std::vector<valid_pair> to_remove;
+        std::vector<valid_pair> to_add;
+
+        for (const auto &vp : data.valid_pairs) {
+            // Remove all pairs involving saddle a
+            if (vp.sm == selected.sm) {
+                to_remove.push_back(vp);
+                continue;
+            }
+            // For each saddle s ≠ a, if (s, b) is valid, replace b with each other maximum c
+            if (vp.v == b) {
+                to_remove.push_back(vp);
+                for (const auto &c : other_maxima) {
+                    auto sc_it = std::find(data.valid_pairs.begin(), data.valid_pairs.end(), valid_pair(vp.sm, c, FT(0)));
+                    if (sc_it != data.valid_pairs.end()) {
+                        to_remove.push_back(*sc_it);
+                    } else {
+                        const auto &face_s = vp.sm.saddle_2.df.face;
+                        std::vector face_s_vertices = {face_s.vertex(0)->point(), face_s.vertex(1)->point(), face_s.vertex(2)->point()};
+                        Point cc_s = circumcenter()(face_s_vertices.begin(), face_s_vertices.end());
+                        FT distance_saddle = squared_distance()(cc_s, face_s.vertex(0)->point());
+                        const auto &face_a = selected.sm.saddle_2.df.face;
+                        FT distance_voronoi = c.is_infinite ? FT(std::numeric_limits<double>::max()) : squared_distance()(c.point, face_a.vertex(0)->point());
+                        FT distance_heuristic = distance_voronoi - distance_saddle;
+                        to_add.push_back(valid_pair(vp.sm, c, CGAL::abs(distance_heuristic)));
+                    }
+                }
+            }
+        }
+
+        for (const auto &r : to_remove) {
+            auto it = std::find(data.valid_pairs.begin(), data.valid_pairs.end(), r);
+            if (it != data.valid_pairs.end())
+                data.valid_pairs.erase(it);
+        }
+
+        for (const auto &a : to_add) {
+            data.valid_pairs.push_back(a);
+        }
+
+        std::sort(data.valid_pairs.begin(), data.valid_pairs.end());
+    }
 }

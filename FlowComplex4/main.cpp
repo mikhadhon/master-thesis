@@ -14,7 +14,7 @@ int main() {
     Eigen::MatrixXd V;
     Eigen::MatrixXi F;
     // V = cliffordgen(1000);
-    //V = sphere2gen(1000);
+    // V = sphere2gen(1000);
     // V = cliffordgengrid(gen_rectangle(1000));
     read_obj("../hopf_torus.obj", V, F);
 
@@ -45,12 +45,23 @@ int main() {
     int vertex_count = static_cast<int>(vertices.size());
     std::map<std::array<double, 4>, size_t> fc_vertex_to_index;
     std::vector<std::array<size_t, 2>> gabriel_edges;
-    std::vector<stable_manifold_2> sm;
+    std::vector<stable_manifold_2> stable_manifolds;
+    std::vector<valid_pair> valid_pairs;
+    std::map<Edge, int> gabriel_topology;
 
-    helper_data data = {vertex_count, vertex_to_index, fc_vertex_to_index, gabriel_edges, sm};
+    helper_data data = {vertex_count, vertex_to_index, fc_vertex_to_index, gabriel_edges, stable_manifolds, valid_pairs, gabriel_topology};
 
     const auto time_start = std::chrono::high_resolution_clock::now();
     flow_complex(dt, reconstructed_vertices, reconstructed_faces, data);
+    reduce_flow_complex(dt, data);
+
+    std::vector<std::array<size_t, 3> > reduced_faces;
+    for (auto sm : data.stable_manifolds) {
+        for (auto fc_face : sm.faces) {
+            reduced_faces.push_back(fc_face);
+        }
+    }
+
     const std::vector<Eigen::VectorXd> V_reconstructed = stereo_projection(reconstructed_vertices);
     polyscope::registerPointCloud("index 2", V_reconstructed);
     const auto time_end = std::chrono::high_resolution_clock::now();
@@ -64,6 +75,7 @@ int main() {
 
     if (!reconstructed_faces.empty()) {
         auto *psRecMesh = polyscope::registerSurfaceMesh("reconstructed mesh", V_reconstructed, reconstructed_faces);
+        polyscope::registerSurfaceMesh("reduced mesh", V_reconstructed, reduced_faces);
     }
 
     polyscope::show();
