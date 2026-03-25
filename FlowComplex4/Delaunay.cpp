@@ -149,8 +149,6 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
             std::vector<Point> shared_tetrahedron_points;
             get_shared_delaunay_tetrahedron(ordered_incident_cells[i], finite_neighbor, shared_tetrahedron_points);
 
-            // Compute exact tetrahedron normal via cofactor expansion of the 3x4 edge matrix
-
             Point p0 = shared_tetrahedron_points[0];
             FT v1[4], v2[4], v3[4];
             for (int k = 0; k < 4; ++k) {
@@ -159,14 +157,12 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
                 v3[k] = shared_tetrahedron_points[3][k] - p0[k];
             }
 
-            // 4D generalized cross product: n[k] = (-1)^k * det of 3x3 minor deleting column k
-            constexpr int skip_cols[4] = {0, 1, 2, 3};
             LA_Matrix minors[4] = {LA_Matrix(3, 3), LA_Matrix(3, 3), LA_Matrix(3, 3), LA_Matrix(3, 3)};
 
             for (int m = 0; m < 4; ++m) {
                 int col_idx = 0;
                 for (int k = 0; k < 4; ++k) {
-                    if (k == skip_cols[m]) continue;
+                    if (k == m) continue;
                     minors[m](0, col_idx) = v1[k];
                     minors[m](1, col_idx) = v2[k];
                     minors[m](2, col_idx) = v3[k];
@@ -179,7 +175,6 @@ Voronoi_face delaunay_face_dual(const Face &face, const Delaunay &dt) {
             FT n2 =  LA::determinant(minors[2]);
             FT n3 = -LA::determinant(minors[3]);
 
-            // Orient normal to point away from the opposite vertex in the finite neighbor
             Point opposite_point;
             for (auto v = finite_neighbor->vertices_begin(); v != finite_neighbor->vertices_end(); ++v) {
                 if (!dt.is_infinite(*v) && !ordered_incident_cells[i]->has_vertex(*v)) {
