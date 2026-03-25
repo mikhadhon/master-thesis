@@ -15,6 +15,8 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
     std::vector<std::array<size_t, 3>> non_gabriel_faces;
     std::vector<std::array<size_t, 3>> index_two_triangles;
     std::vector<Eigen::VectorXd> circumcenters;
+    int count = 0;
+    std::vector<std::array<size_t, 2>> gabriel_edges;
 
     for (auto facet = delaunay.facets_begin(); facet != delaunay.facets_end(); ++facet) {
         if (!delaunay.is_infinite(*facet)) {
@@ -28,18 +30,22 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
             }
             Face face(face_no_co_vertex, facet->index_of_covertex());
             delaunay_faces.push_back({vertex_to_index[face.face.vertex(0)], vertex_to_index[face.face.vertex((1))], vertex_to_index[face.face.vertex((2))]});
-            // int debug = 5991;
-            // if (vertex_to_index[face.face.vertex(0)] == debug || vertex_to_index[face.face.vertex(1)] == debug || vertex_to_index[face.face.vertex(2)] == debug) {
-            //     std::vector face_vertices = {face.face.vertex(0)->point(), face.face.vertex(1)->point(), face.face.vertex(2)->point()};
-            //     circumcenters.push_back(make_point_eigen(circumcenter()(face_vertices.begin(), face_vertices.end())));
-            //     std::vector<Eigen::VectorXd> vv;
-            //     auto current_voronoi_edge = delaunay_face_dual(face, delaunay);
-            //     vv.push_back(current_voronoi_edge.vertex1.point);
-            //     vv.push_back(current_voronoi_edge.vertex2.point);
-            //     std::vector<std::array<size_t, 2>> ve = {{0, 1}};
-            //     //polyscope::registerCurveNetwork(std::to_string(count++), vv, ve);
-            // }
             if (is_index_two_critical_point(face, delaunay)) {
+                if (vertex_to_index[face.face.vertex(0)] == 6767 && vertex_to_index[face.face.vertex(1)] == 6694 && vertex_to_index[face.face.vertex(2)] == 6784) {
+                    std::vector face_vertices = {face.face.vertex(0)->point(), face.face.vertex(1)->point(), face.face.vertex(2)->point()};
+                    circumcenters.push_back(make_point_eigen(circumcenter()(face_vertices.begin(), face_vertices.end())));
+                    Edge a(face.face.vertex(0), face.face.vertex(1), face.face.vertex(2));
+                    Edge b(face.face.vertex(0), face.face.vertex(2), face.face.vertex(1));
+                    Edge c(face.face.vertex(1), face.face.vertex(2), face.face.vertex(0));
+                    auto current_voronoi_face = delaunay_edge_dual(a, face, delaunay);
+                    auto b_face = delaunay_edge_dual(b, face, delaunay);
+                    auto c_face = delaunay_edge_dual(c, face, delaunay);
+                    polyscope::registerCurveNetwork(std::to_string(count++), current_voronoi_face.ps_vertices, current_voronoi_face.ps_edges);
+                    polyscope::registerCurveNetwork(std::to_string(count++), b_face.ps_vertices, b_face.ps_edges);
+                    polyscope::registerCurveNetwork(std::to_string(count++), c_face.ps_vertices, c_face.ps_edges);
+                    std::vector<std::array<size_t, 2>> ng_edge = {{0, 1}};
+                    polyscope::registerCurveNetwork(std::to_string(count++), face_vertices, ng_edge);
+                }
                 std::vector<std::array<size_t, 3>> stable_manifold;
                 std::queue<std::tuple<Eigen::VectorXd, Edge, Face>> edge_queue;
 
@@ -72,6 +78,7 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                         fc_face[2] = fc_vertex_to_index[fc_center];
                         faces.push_back(fc_face);
                         stable_manifold.push_back(fc_face);
+                        gabriel_edges.push_back({vertex_to_index[current_edge.vertex1], vertex_to_index[current_edge.vertex2]});
                     }
                     else {
                         Voronoi_edge current_voronoi_edge = delaunay_face_dual(current_delaunay_face, delaunay);
@@ -122,12 +129,16 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
                                 edge_queue.emplace(s_prime.value(), next_edge, next_face.value());
                             }
                         }
+                        else {
+                            std::cout << "missed intersection" << std::endl;
+                        }
                     }
                 }
                 index_2_stable_manifolds.push_back(stable_manifold);
             }
         }
     }
+    polyscope::registerCurveNetwork("gabriel edges", vertices, gabriel_edges);
     auto indexTwoPoints = polyscope::registerPointCloud("index two points", index_two_points);
     //polyscope::registerSurfaceMesh("delaunay readout", vertices, delaunay_faces);
     vertices.resize(vertex_count);

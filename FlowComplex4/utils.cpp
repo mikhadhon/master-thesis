@@ -56,9 +56,9 @@ void read_obj(const std::string &file_path, Eigen::MatrixXd &V, Eigen::MatrixXi 
 void write_to_obj(Eigen::MatrixXd V, Eigen::MatrixXi F, std::string identifier) {
     std::string filename = "../output/" + identifier + "_" + get_timestamp() + ".obj";
     if (igl::writeOBJ(filename, V, F)) {
-        std::cout << "Curve network saved to: " << filename << std::endl;
+        std::cout << "saved to: " << filename << std::endl;
     } else {
-        std::cerr << "Failed to save curve to: " << filename << std::endl;
+        std::cerr << "Failed to save to: " << filename << std::endl;
     }
 }
 
@@ -106,6 +106,3 @@ void write_faces_to_vector(
         faces.push_back(face);
     }
 }
-
-
-

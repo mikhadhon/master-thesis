@@ -63,7 +63,7 @@ int main() {
         std::string filename = testfile + std::to_string(n);
         // std::string filepath = "../" + filename + ".ply";
         //std::string filepath = "../output/happy_vrip_res1000000_1000000_20260204_213045.obj";
-        std::string filepath = "../happy_vrip_res4.ply";
+        std::string filepath = "../happy_vrip_res1.ply";
         Eigen::MatrixXd V;
         read_ply(filepath, V, F);
         //read_obj(filepath, V, F);
@@ -75,21 +75,21 @@ int main() {
         Eigen::MatrixXd B;
         Eigen::MatrixXi FI;
         Eigen::MatrixXd X;
-        //igl::random_points_on_mesh(n, V, F, B, FI, X);
+        igl::random_points_on_mesh(n, V, F, B, FI, X);
 
         Delaunay delaunay3D(3);
 
         //load_obj_points("stanford-bunny.obj", points);
         //load_xyz_points("../bunny_raw.xyz", points);
 
-        // for (int i = 0; i < X.rows(); i++) {
-        //     Delaunay::Point p(X(i, 0), X(i, 1), X(i, 2));
-        //     points.push_back(p);
-        // }
-        for (int i = 0; i < V.rows(); i++) {
-            Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));
+        for (int i = 0; i < X.rows(); i++) {
+            Delaunay::Point p(X(i, 0), X(i, 1), X(i, 2));
             points.push_back(p);
         }
+        // for (int i = 0; i < V.rows(); i++) {
+        //     Delaunay::Point p(V(i, 0), V(i, 1), V(i, 2));
+        //     points.push_back(p);
+        // }
 
         insert_points(points, delaunay3D);
 
@@ -122,7 +122,7 @@ int main() {
         timestamps << points.size() << "," << float_ms.count() << std::endl;
 
         std::vector<Edge> gabriel_edges;
-        find_gabriel_edges(delaunay3D, gabriel_edges);
+        //find_gabriel_edges(delaunay3D, gabriel_edges);
 
         std::vector<std::array<size_t, 2>> ps_edges;
         for (auto edge: gabriel_edges) {

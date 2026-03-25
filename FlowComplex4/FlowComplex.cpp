@@ -198,15 +198,20 @@ std::array<size_t, 3> make_fc_face_non_gabriel(
 void index_two_stable_manifold(const Delaunay &dt, const Face &starting_face, std::vector<std::array<size_t, 3>> &faces, helper_data &data) {
     std::queue<std::tuple<Point, Edge, Face>> edge_queue;
     std::vector<Edge> boundary;
+    std::vector<std::array<double, 4>> added_vertices;
+    std::vector<std::tuple<Delaunay::Vertex_handle, Delaunay::Vertex_handle, std::array<double, 4>>> added_faces_gabriel;
+    std::vector<std::tuple<Delaunay::Vertex_handle, std::array<double, 4>, std::array<double, 4>>> added_faces_non_gabriel;
+    FT max_distance = 0;
+    std::vector<fc_edge> added_edges;
+    std::vector<std::array<size_t, 3>> sm_faces;
 
     std::vector cgal_points = {starting_face.face.vertex(0)->point(), starting_face.face.vertex(1)->point(), starting_face.face.vertex(2)->point()};
     Point cgal_center = circumcenter()(cgal_points.begin(), cgal_points.end());
+    data.index_2.push_back(cgal_center);
 
     edge_queue.emplace(cgal_center, Edge(starting_face.face.vertex(0), starting_face.face.vertex(1), starting_face.face.vertex(2)), starting_face);
     edge_queue.emplace(cgal_center, Edge(starting_face.face.vertex(0), starting_face.face.vertex(2), starting_face.face.vertex(1)), starting_face);
     edge_queue.emplace(cgal_center, Edge(starting_face.face.vertex(1), starting_face.face.vertex(2), starting_face.face.vertex(0)), starting_face);
-
-    std::vector<std::array<size_t, 3>> sm_faces;
 
     while (!edge_queue.empty()) {
         std::tuple<Point, Edge, Face> current = edge_queue.front();
@@ -218,19 +223,29 @@ void index_two_stable_manifold(const Delaunay &dt, const Face &starting_face, st
         if (is_gabriel(current_edge, dt)) {
             std::array center_converted = {CGAL::to_double(current_center[0]), CGAL::to_double(current_center[1]), CGAL::to_double(current_center[2]), CGAL::to_double(current_center[3])};
             index_constructed_vertex(center_converted, data.fc_vertex_to_index, data.vertex_count);
+            added_vertices.push_back(center_converted);
+
+            if (FT distance_center = squared_distance()(current_center, current_edge.vertex1->point()); distance_center > max_distance) {
+                max_distance = distance_center;
+            }
+
+            fc_edge e1(current_edge.vertex1->point(), current_edge.vertex2->point());
+            fc_edge e2(current_edge.vertex1->point(), current_center);
+            fc_edge e3(current_center, current_edge.vertex2->point());
+
+            std::vector fc_edges = {e1, e2, e3};
+
+            for (fc_edge e : fc_edges) {
+                added_edges.push_back(e);
+            }
 
             std::array<size_t, 3> fc_face = make_fc_face_gabriel(current_edge.vertex1, current_edge.vertex2, center_converted, data.vertex_to_index, data.fc_vertex_to_index);
 
             faces.push_back(fc_face);
             sm_faces.push_back(fc_face);
+            added_faces_gabriel.push_back({current_edge.vertex1, current_edge.vertex2, center_converted});
             data.gabriel_edges.push_back({data.vertex_to_index[current_edge.vertex1], data.vertex_to_index[current_edge.vertex2]});
             boundary.push_back(current_edge);
-            if (!data.gabriel_topology.contains(current_edge)) {
-                data.gabriel_topology[current_edge] = 1;
-            }
-            else {
-                data.gabriel_topology[current_edge]++;
-            }
         }
         else {
             Point edge_mid = midpoint()(current_edge.vertex1->point(), current_edge.vertex2->point());
@@ -248,40 +263,81 @@ void index_two_stable_manifold(const Delaunay &dt, const Face &starting_face, st
                 }
             }
 
-            std::array fc_center = {CGAL::to_double(current_center[0]), CGAL::to_double(current_center[1]), CGAL::to_double(current_center[2]), CGAL::to_double(current_center[3])};
-            std::array fc_s_prime = {CGAL::to_double(s_prime[0]), CGAL::to_double(s_prime[1]), CGAL::to_double(s_prime[2]), CGAL::to_double(s_prime[3])};
-
-            index_constructed_vertex(fc_center, data.fc_vertex_to_index, data.vertex_count);
-            index_constructed_vertex(fc_s_prime, data.fc_vertex_to_index, data.vertex_count);
-
-            std::array<size_t, 3> fc_face1 = make_fc_face_non_gabriel(current_edge.vertex1, fc_center, fc_s_prime, data.vertex_to_index, data.fc_vertex_to_index);
-            std::array<size_t, 3> fc_face2 = make_fc_face_non_gabriel(current_edge.vertex2, fc_center, fc_s_prime, data.vertex_to_index, data.fc_vertex_to_index);
-
-            faces.push_back(fc_face1);
-            faces.push_back(fc_face2);
-            sm_faces.push_back(fc_face1);
-            sm_faces.push_back(fc_face2);
-
-            for (int i = 0; i <= next_face->face.face_dimension(); i++) {
-                Edge next_edge(next_face->face.vertex(i), next_face->face.vertex((i + 1)%3), next_face->face.vertex((i + 2)%3));
-                if (next_edge == current_edge) {
-                    continue;
+            if (next_face.has_value()) {
+                if (FT distance_s_prime = squared_distance()(s_prime, current_edge.vertex1->point()); distance_s_prime > max_distance) {
+                    max_distance = distance_s_prime;
                 }
-                edge_queue.emplace(s_prime, next_edge, *next_face);
+
+                std::array fc_center = {CGAL::to_double(current_center[0]), CGAL::to_double(current_center[1]), CGAL::to_double(current_center[2]), CGAL::to_double(current_center[3])};
+                std::array fc_s_prime = {CGAL::to_double(s_prime[0]), CGAL::to_double(s_prime[1]), CGAL::to_double(s_prime[2]), CGAL::to_double(s_prime[3])};
+
+                index_constructed_vertex(fc_center, data.fc_vertex_to_index, data.vertex_count);
+                index_constructed_vertex(fc_s_prime, data.fc_vertex_to_index, data.vertex_count);
+                added_vertices.push_back(fc_center);
+                added_vertices.push_back(fc_s_prime);
+
+                fc_edge e1(current_edge.vertex1->point(), current_center);
+                fc_edge e2(current_edge.vertex1->point(), s_prime);
+                fc_edge e3(current_center, s_prime);
+                fc_edge e4(current_edge.vertex2->point(), current_center);
+                fc_edge e5(current_edge.vertex2->point(), s_prime);
+                fc_edge e6(s_prime, current_center);
+
+                std::vector fc_edges = {e1, e2, e3, e4, e5, e6};
+
+                for (fc_edge e : fc_edges) {
+                    added_edges.push_back(e);
+                }
+
+                std::array<size_t, 3> fc_face1 = make_fc_face_non_gabriel(current_edge.vertex1, fc_center, fc_s_prime, data.vertex_to_index, data.fc_vertex_to_index);
+                std::array<size_t, 3> fc_face2 = make_fc_face_non_gabriel(current_edge.vertex2, fc_center, fc_s_prime, data.vertex_to_index, data.fc_vertex_to_index);
+
+                faces.push_back(fc_face1);
+                faces.push_back(fc_face2);
+                sm_faces.push_back(fc_face1);
+                sm_faces.push_back(fc_face2);
+
+                added_faces_non_gabriel.push_back({current_edge.vertex1, fc_s_prime, fc_center});
+                added_faces_non_gabriel.push_back({current_edge.vertex2, fc_s_prime, fc_center});
+
+                for (int i = 0; i <= next_face->face.face_dimension(); i++) {
+                    Edge next_edge(next_face->face.vertex(i), next_face->face.vertex((i + 1)%3), next_face->face.vertex((i + 2)%3));
+                    if (next_edge == current_edge) {
+                        continue;
+                    }
+                    edge_queue.emplace(s_prime, next_edge, *next_face);
+                }
+            }
+            else {
+                std::cout << "missed intersection" << std::endl;
             }
         }
     }
     Saddle_2 saddle_2(starting_face, delaunay_face_dual(starting_face, dt));
-    stable_manifold_2 sm(boundary, saddle_2, sm_faces);
-    data.stable_manifolds.push_back(sm);
 
-    Voronoi_face triangle_dual = delaunay_face_dual(starting_face, dt);
-    FT distance_saddle = squared_distance()(cgal_center, starting_face.face.vertex(0)->point());
-    for (Voronoi_vertex v : triangle_dual.voronoi_vertices) {
-        FT distance_voronoi = v.is_infinite ? FT(std::numeric_limits<double>::max()) : squared_distance()(v.point, starting_face.face.vertex(0)->point());
-        FT distance_heuristic = distance_voronoi - distance_saddle;
+    if (max_distance < data.threshold) {
+        for (fc_edge e : added_edges) {
+            if (!data.edge_incidences.contains(e)) data.edge_incidences[e] = 1;
+            else data.edge_incidences[e]++;
+        }
+        // for (auto added_vertex : added_vertices) {
+        //     index_constructed_vertex(added_vertex, data.fc_vertex_to_index, data.vertex_count);
+        // }
+        // std::vector<std::array<size_t, 3>> sm_faces;
+        // for (auto added_f : added_faces_gabriel) {
+        //     auto gabriel_face = make_fc_face_gabriel(std::get<0>(added_f), std::get<1>(added_f), std::get<2>(added_f), data.vertex_to_index, data.fc_vertex_to_index);
+        //     sm_faces.push_back(gabriel_face);
+        //     faces.push_back(gabriel_face);
+        // }
+        // for (auto added_f : added_faces_non_gabriel) {
+        //     auto non_gabriel_face = make_fc_face_non_gabriel(std::get<0>(added_f), std::get<1>(added_f), std::get<2>(added_f), data.vertex_to_index, data.fc_vertex_to_index);
+        //     sm_faces.push_back(non_gabriel_face);
+        //     faces.push_back(non_gabriel_face);
+        // }
 
-        data.valid_pairs.push_back(valid_pair(sm, v, CGAL::abs(distance_heuristic)));
+        stable_manifold_2 sm(boundary, saddle_2, sm_faces, max_distance);
+        data.stable_manifolds.push_back(sm);
+
     }
 }
 
@@ -300,85 +356,5 @@ void flow_complex(Delaunay &delaunay, std::vector<Eigen::VectorXd> &vertices, st
         vertices[index] = new_vertex;
     }
     polyscope::registerCurveNetwork("Gabriel edges", V_projected, data.gabriel_edges);
-}
-
-void reduce_flow_complex(Delaunay &dt, helper_data &data) {
-    std::sort(data.valid_pairs.begin(), data.valid_pairs.end());
-
-    while (true) {
-        // Step 5: Find the valid pair with minimum distance that fulfills the topology constraint
-        auto best_it = std::find_if(data.valid_pairs.begin(), data.valid_pairs.end(),
-            [&](const valid_pair &vp) {
-                return std::any_of(vp.sm.gabriel_edges.begin(), vp.sm.gabriel_edges.end(),
-                    [&](const Edge &e) { return data.gabriel_topology[e] > 2; });
-            });
-
-        if (best_it == data.valid_pairs.end())
-            break;
-
-        valid_pair selected = *best_it;
-        const Voronoi_vertex &b = selected.v;
-
-        // Step 7: Collect all other maxima paired with saddle a (all voronoi vertices except b)
-        std::vector<Voronoi_vertex> other_maxima;
-        for (const auto &v : selected.sm.saddle_2.dual.voronoi_vertices) {
-            if (!(v == b))
-                other_maxima.push_back(v);
-        }
-
-        // Step 6: Remove stable manifold of a from F
-        auto sm_it = std::find(data.stable_manifolds.begin(), data.stable_manifolds.end(), selected.sm);
-        if (sm_it != data.stable_manifolds.end()) {
-            data.stable_manifolds.erase(sm_it);
-        }
-
-        // Update gabriel_topology: a's boundary is removed
-        for (const Edge &e : selected.sm.gabriel_edges) {
-            data.gabriel_topology[e]--;
-        }
-
-        // Remove all of saddle a's own pairs from V (a is removed from F)
-        // and update pairs for other saddles paired with b
-        std::vector<valid_pair> to_remove;
-        std::vector<valid_pair> to_add;
-
-        for (const auto &vp : data.valid_pairs) {
-            // Remove all pairs involving saddle a
-            if (vp.sm == selected.sm) {
-                to_remove.push_back(vp);
-                continue;
-            }
-            // For each saddle s ≠ a, if (s, b) is valid, replace b with each other maximum c
-            if (vp.v == b) {
-                to_remove.push_back(vp);
-                for (const auto &c : other_maxima) {
-                    auto sc_it = std::find(data.valid_pairs.begin(), data.valid_pairs.end(), valid_pair(vp.sm, c, FT(0)));
-                    if (sc_it != data.valid_pairs.end()) {
-                        to_remove.push_back(*sc_it);
-                    } else {
-                        const auto &face_s = vp.sm.saddle_2.df.face;
-                        std::vector face_s_vertices = {face_s.vertex(0)->point(), face_s.vertex(1)->point(), face_s.vertex(2)->point()};
-                        Point cc_s = circumcenter()(face_s_vertices.begin(), face_s_vertices.end());
-                        FT distance_saddle = squared_distance()(cc_s, face_s.vertex(0)->point());
-                        const auto &face_a = selected.sm.saddle_2.df.face;
-                        FT distance_voronoi = c.is_infinite ? FT(std::numeric_limits<double>::max()) : squared_distance()(c.point, face_a.vertex(0)->point());
-                        FT distance_heuristic = distance_voronoi - distance_saddle;
-                        to_add.push_back(valid_pair(vp.sm, c, CGAL::abs(distance_heuristic)));
-                    }
-                }
-            }
-        }
-
-        for (const auto &r : to_remove) {
-            auto it = std::find(data.valid_pairs.begin(), data.valid_pairs.end(), r);
-            if (it != data.valid_pairs.end())
-                data.valid_pairs.erase(it);
-        }
-
-        for (const auto &a : to_add) {
-            data.valid_pairs.push_back(a);
-        }
-
-        std::sort(data.valid_pairs.begin(), data.valid_pairs.end());
-    }
+    polyscope::getCurveNetwork("Gabriel edges")->setEnabled(false);
 }

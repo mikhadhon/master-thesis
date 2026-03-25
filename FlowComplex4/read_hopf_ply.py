@@ -10,10 +10,11 @@ def load_hopf_vertices(hpath):
     return np.array(hopf)
 
 if __name__ == "__main__":
-    hopf = load_hopf_vertices("hopf_torus_res_100.ply")
+    filename = "happy_vrip_res4"
+    hopf = load_hopf_vertices(filename + ".ply")
 
-    f = open("hopf_torus_res_100.obj", "w")
+    f = open(filename + ".obj", "w")
     for i in range(len(hopf)):
-        f.write("v %f %f %f %f\n" % (hopf[i][0], hopf[i][1], hopf[i][2], hopf[i][3]))
+        f.write("v %f %f %f %f\n" % (hopf[i][0], hopf[i][1], hopf[i][2], 0))
 
     f.close()

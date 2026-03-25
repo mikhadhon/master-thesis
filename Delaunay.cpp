@@ -77,8 +77,8 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt) {
         Voronoi_vertex v_vertex;
 
         if (!is_infinite_tet[i]) {
-            Eigen::VectorXd circumcenter = simplex_circumsphere(ordered_incident_cells[i]);
-            v_vertex = Voronoi_vertex{false, circumcenter};
+            Eigen::VectorXd cc = simplex_circumsphere(ordered_incident_cells[i]);
+            v_vertex = Voronoi_vertex{false, cc};
         } else {
             Delaunay::Full_cell_handle finite_neighbor = is_infinite_tet[(i + 1) % is_infinite_tet.size()] ? ordered_incident_cells[(i - 1) % is_infinite_tet.size()] : ordered_incident_cells[(i + 1) % is_infinite_tet.size()];
             Eigen::VectorXd finite_circumcenter = simplex_circumsphere(finite_neighbor);
@@ -107,7 +107,7 @@ Voronoi_face delaunay_edge_dual(Edge &edge, Face &df, Delaunay &dt) {
                 normal = -normal;
             }
 
-            Eigen::VectorXd infinite_point = finite_circumcenter + 2 * normal;
+            Eigen::VectorXd infinite_point = finite_circumcenter + normal;
             v_vertex = Voronoi_vertex{true, infinite_point};
             infinite_vertices.push_back(infinite_point);
         }
